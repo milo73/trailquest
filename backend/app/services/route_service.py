@@ -1,0 +1,98 @@
+"""Route service (PRD §7.3, §9.1).
+
+Selects POIs and builds a loop (start ≈ end). The MVP target is routing over the
+*walking* network (OSRM/GraphHopper/Valhalla) so distance is measured over the
+path network, not as-the-crow-flies. This skeleton uses a straight-line (haversine)
+estimate as a placeholder and selects POIs by a simple nearest-neighbour loop —
+clearly marked so it is replaced before launch.
+"""
+
+from __future__ import annotations
+
+import uuid
+from math import asin, cos, radians, sin, sqrt
+
+from app.config import settings
+from app.models.schemas import (
+    POI,
+    GeoPoint,
+    Theme,
+    Trail,
+    TrailRequest,
+)
+from app.services import content_service, poi_service
+
+
+def _haversine_km(a: GeoPoint, b: GeoPoint) -> float:
+    r = 6371.0
+    dlat, dlon = radians(b.lat - a.lat), radians(b.lon - a.lon)
+    h = sin(dlat / 2) ** 2 + cos(radians(a.lat)) * cos(radians(b.lat)) * sin(dlon / 2) ** 2
+    return 2 * r * asin(sqrt(h))
+
+
+def _nearest_neighbour_loop(start: GeoPoint, pois: list[POI]) -> list[POI]:
+    """Order POIs as a greedy loop starting and ending near ``start``."""
+    remaining = list(pois)
+    ordered: list[POI] = []
+    cursor = start
+    while remaining:
+        nxt = min(remaining, key=lambda p: _haversine_km(cursor, p.location))
+        ordered.append(nxt)
+        remaining.remove(nxt)
+        cursor = nxt.location
+    return ordered
+
+
+def _loop_distance_km(start: GeoPoint, ordered: list[POI]) -> float:
+    if not ordered:
+        return 0.0
+    points = [start, *[p.location for p in ordered], start]  # loop back to start
+    return sum(_haversine_km(points[i], points[i + 1]) for i in range(len(points) - 1))
+
+
+def _select_pois(candidates: list[POI], distance_km: float) -> list[POI]:
+    """Pick POIs with verifiable facts, roughly one stop per kilometre.
+
+    Prefer no stop over a wrong stop: fact-less POIs are dropped (PRD §8.3, §13).
+    """
+    with_facts = [p for p in candidates if p.has_verifiable_facts]
+    target_stops = max(2, round(distance_km))
+    return with_facts[:target_stops]
+
+
+def generate_trail(req: TrailRequest) -> Trail:
+    """Generate a full trail for the request (the thin end-to-end vertical)."""
+    candidates = poi_service.candidates(req.start, req.distance_km)
+    selected = _select_pois(candidates, req.distance_km)
+    ordered = _nearest_neighbour_loop(req.start, selected)
+
+    stops = [
+        content_service.build_stop(poi, req.theme, order=i + 1) for i, poi in enumerate(ordered)
+    ]
+
+    actual_km = round(_loop_distance_km(req.start, ordered), 2)
+    walk_min = (actual_km / settings.walking_speed_kmh) * 60
+    duration_min = round(walk_min + len(stops) * settings.minutes_per_stop)
+
+    all_facts = [f for s in stops for f in s.poi.facts]
+    attributions = content_service.collect_attributions(all_facts)
+    # OSM attribution is always required when its data underpins routing (PRD §10).
+    osm_attr = "OpenStreetMap (ODbL)"
+    if osm_attr not in attributions:
+        attributions.append(osm_attr)
+
+    return Trail(
+        id=str(uuid.uuid4()),
+        city=settings.default_city,
+        theme=req.theme,
+        requested_distance_km=req.distance_km,
+        actual_distance_km=actual_km,
+        estimated_duration_min=duration_min,
+        start=req.start,
+        stops=stops,
+        attributions=sorted(attributions),
+    )
+
+
+def default_theme() -> Theme:
+    return Theme.MIXED

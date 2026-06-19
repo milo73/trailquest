@@ -4,14 +4,31 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current state
 
-This repository currently contains **no application code** — only `PRD.md` (the
-product spec, written in Dutch), `README.md`, and `LICENSE` (MIT). Any
-implementation work starts from scratch. When scaffolding, follow the
-architecture and decisions in `PRD.md`; the sections below distill the parts
-that constrain how code must be written, and where the PRD leaves a choice open.
+The product spec lives in `PRD.md` (Dutch); `README.md` and `LICENSE` (MIT) sit
+alongside it. The first service — the **Python/FastAPI backend** — is scaffolded
+under `backend/` as a walking skeleton (see `backend/README.md`). The mobile
+client (React Native) is not built yet.
 
-There are no build, lint, or test commands yet. Establish them when the first
-service is created and add them here.
+`backend/` is a **modular monolith**: each module under `app/services/` maps to a
+target service from PRD §9.1 (route, POI/data, content/RAG, gamification) so it
+can be split out later. The domain model in `backend/app/models/schemas.py`
+encodes the content-accuracy constraint below — read it before touching content
+or question logic.
+
+### Backend commands (run from `backend/`)
+
+```bash
+python3 -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"          # install with dev tools
+uvicorn app.main:app --reload    # run API (docs at /docs)
+pytest                           # full test suite
+pytest tests/test_trails_api.py::test_health   # single test
+ruff check . && ruff format --check .          # lint + format
+mypy app                         # type-check
+```
+
+CI (`.github/workflows/backend.yml`) runs ruff, format check, mypy, and pytest on
+backend changes. Keep all four green.
 
 ## What the product is
 
