@@ -1,0 +1,111 @@
+"""Tests for the external-source clients, with HTTP mocked (no network)."""
+
+from __future__ import annotations
+
+import httpx
+import pytest
+
+from app.clients import ClientError, osrm, overpass, wikidata
+
+
+class _FakeResponse:
+    def __init__(self, payload: object, status: int = 200):
+        self._payload = payload
+        self.status_code = status
+
+    def raise_for_status(self) -> None:
+        if self.status_code >= 400:
+            raise httpx.HTTPStatusError("error", request=None, response=None)  # type: ignore[arg-type]
+
+    def json(self) -> object:
+        return self._payload
+
+
+def test_overpass_parses_nodes_and_centers(monkeypatch: pytest.MonkeyPatch) -> None:
+    payload = {
+        "elements": [
+            {
+                "type": "node",
+                "id": 1,
+                "lat": 52.38,
+                "lon": 4.63,
+                "tags": {"name": "A", "wikidata": "Q1"},
+            },
+            {
+                "type": "way",
+                "id": 2,
+                "center": {"lat": 52.39, "lon": 4.64},
+                "tags": {"name": "B", "wikidata": "Q2"},
+            },
+            {"type": "node", "id": 3, "lat": 52.4, "lon": 4.65, "tags": {"name": "NoWikidata"}},
+        ]
+    }
+    monkeypatch.setattr(overpass.httpx, "post", lambda *a, **k: _FakeResponse(payload))
+    pois = overpass.fetch_pois(52.38, 4.63, 600)
+    assert [p.wikidata_id for p in pois] == ["Q1", "Q2"]  # the un-tagged node is dropped
+    assert pois[1].lat == 52.39  # center used for the way
+
+
+def test_overpass_raises_client_error_on_http_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(overpass.httpx, "post", lambda *a, **k: _FakeResponse({}, status=429))
+    with pytest.raises(ClientError):
+        overpass.fetch_pois(52.38, 4.63, 600)
+
+
+def test_wikidata_extracts_year_and_height(monkeypatch: pytest.MonkeyPatch) -> None:
+    payload = {
+        "entities": {
+            "Q1542249": {
+                "claims": {
+                    "P571": [
+                        {
+                            "mainsnak": {
+                                "snaktype": "value",
+                                "datavalue": {"value": {"time": "+1370-00-00T00:00:00Z"}},
+                            }
+                        }
+                    ],
+                    "P2048": [
+                        {
+                            "mainsnak": {
+                                "snaktype": "value",
+                                "datavalue": {"value": {"amount": "+78"}},
+                            }
+                        }
+                    ],
+                }
+            }
+        }
+    }
+    monkeypatch.setattr(wikidata.httpx, "get", lambda *a, **k: _FakeResponse(payload))
+    facts = wikidata.fetch_facts("Q1542249")
+    assert facts == {"build_year": "1370", "height_m": "78"}
+
+
+def test_wikidata_omits_missing_properties(monkeypatch: pytest.MonkeyPatch) -> None:
+    payload = {"entities": {"Q2": {"claims": {}}}}
+    monkeypatch.setattr(wikidata.httpx, "get", lambda *a, **k: _FakeResponse(payload))
+    assert wikidata.fetch_facts("Q2") == {}
+
+
+def test_osrm_orders_loop_and_reports_distance(monkeypatch: pytest.MonkeyPatch) -> None:
+    # start=0, then two stops; OSRM says visit input index 2 before index 1.
+    payload = {
+        "code": "Ok",
+        "trips": [{"distance": 2500.0}],
+        "waypoints": [
+            {"waypoint_index": 0},  # input 0 (start)
+            {"waypoint_index": 2},  # input 1 visited last
+            {"waypoint_index": 1},  # input 2 visited first
+        ],
+    }
+    monkeypatch.setattr(osrm.httpx, "get", lambda *a, **k: _FakeResponse(payload))
+    trip = osrm.optimized_loop([(52.0, 4.0), (52.1, 4.1), (52.2, 4.2)])
+    assert trip.order == [0, 2, 1]
+    assert trip.distance_km == 2.5
+
+
+def test_osrm_raises_on_non_ok_code(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(osrm.httpx, "get", lambda *a, **k: _FakeResponse({"code": "NoRoute"}))
+    with pytest.raises(ClientError):
+        osrm.optimized_loop([(52.0, 4.0), (52.1, 4.1)])
