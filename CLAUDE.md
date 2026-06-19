@@ -95,10 +95,20 @@ AI features, default to the latest Claude models.
 
 Carry source attribution through the data model from ingestion to display.
 
-## Open decisions (PRD §19) — don't assume these silently
+## Resolved decisions (PRD §19) — build to these
 
-Guest mode vs. required account; first launch city/cities; React Native vs.
-Flutter; OSM tiles vs. Mapbox/Google; gating strictness (attempts before reveal,
-skippable stops); curation model (pure AI + sampling vs. human-in-the-loop);
-time-based vs. distance-based input in MVP; consumer-first vs. B2B/B2G monetization.
-If a task depends on one of these, surface it rather than picking arbitrarily.
+These were previously open; they are now settled. Don't re-litigate them.
+
+- **Auth:** **Guest mode** — playable without an account. Tie gamification/history
+  to an optional account the user can create later.
+- **First launch city:** **Haarlem.** Focus content investment and GTM here.
+- **Frontend:** **React Native** (single iOS/Android codebase). Pick map,
+  geofencing, and cache libraries from the RN ecosystem.
+- **Map stack:** start on a **free tier (e.g. Google Maps)** for tiles/geocoding;
+  watch usage limits. OSM remains the source for POIs and walking-network routing.
+- **Gating:** **3 attempts**, then reveal the answer and continue. **Stops are not
+  skippable** — progress is linear.
+- **Curation:** **pure AI + sampling** in MVP (no per-POI human-in-the-loop).
+  Sample-based review plus the per-stop feedback button feed corrections.
+- **Input mode:** **distance-based only** in MVP. Time-based input is roadmap.
+- **Monetization:** **consumer-first** (freemium); explore B2B/B2G later.
