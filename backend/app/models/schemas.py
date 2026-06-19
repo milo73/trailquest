@@ -120,6 +120,10 @@ class POI(BaseModel):
     name: str
     location: GeoPoint
     facts: list[Fact] = Field(default_factory=list)
+    # Narrative background to paraphrase (Wikipedia, CC BY-SA). Not a verifiable
+    # fact — it colours the story but never sources a gating answer (PRD §8.1).
+    background: str | None = None
+    background_source: Source | None = None
 
     @property
     def has_verifiable_facts(self) -> bool:

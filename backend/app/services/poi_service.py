@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import logging
 
-from app.clients import ClientError, overpass, wikidata
+from app.clients import ClientError, overpass, wikidata, wikipedia
 from app.config import settings
 from app.models.schemas import (
     POI,
@@ -34,18 +34,16 @@ def _wikidata(qid: str) -> Source:
     return Source(name="Wikidata", license=SourceLicense.CC0, reference=f"wikidata:{qid}")
 
 
-# Seed POIs for Haarlem. Facts carry their source (PRD §8.1, §10).
+# Seed POIs for Haarlem. Facts carry their source (PRD §8.1, §10) and every
+# value/QID below is verified against Wikidata — no invented facts or references.
 _HAARLEM_POIS: list[POI] = [
     POI(
         id="grote-kerk-haarlem",
-        name="Grote Kerk (St.-Bavokerk)",
+        name="Grote Kerk (Grote of Sint-Bavokerk)",
         location=GeoPoint(lat=52.3814, lon=4.6366),
         facts=[
-            Fact(key="build_year_start", value="1370", source=_wikidata("Q1542249")),
-            Fact(key="height_m", value="78", source=_wikidata("Q1542249")),
-            Fact(
-                key="architectural_style", value="Brabantine Gothic", source=_wikidata("Q1542249")
-            ),
+            Fact(key="build_year", value="1400", source=_wikidata("Q1545193")),
+            Fact(key="heritage_status", value="Rijksmonument", source=_wikidata("Q1545193")),
         ],
     ),
     POI(
@@ -53,8 +51,7 @@ _HAARLEM_POIS: list[POI] = [
         name="Molen De Adriaan",
         location=GeoPoint(lat=52.3849, lon=4.6406),
         facts=[
-            Fact(key="build_year", value="1779", source=_wikidata("Q1854239")),
-            Fact(key="type", value="smock mill", source=_wikidata("Q1854239")),
+            Fact(key="build_year", value="1779", source=_wikidata("Q2763574")),
         ],
     ),
     POI(
@@ -62,7 +59,8 @@ _HAARLEM_POIS: list[POI] = [
         name="Frans Hals Museum",
         location=GeoPoint(lat=52.3759, lon=4.6320),
         facts=[
-            Fact(key="founded_year", value="1862", source=_wikidata("Q574961")),
+            Fact(key="build_year", value="1862", source=_wikidata("Q574961")),
+            Fact(key="architect", value="Lucas Christiaan Dumont", source=_wikidata("Q574961")),
         ],
     ),
     POI(
@@ -70,10 +68,8 @@ _HAARLEM_POIS: list[POI] = [
         name="Teylers Museum",
         location=GeoPoint(lat=52.3796, lon=4.6411),
         facts=[
-            Fact(key="founded_year", value="1778", source=_wikidata("Q1318217")),
-            Fact(
-                key="status", value="oldest museum in the Netherlands", source=_wikidata("Q1318217")
-            ),
+            Fact(key="build_year", value="1784", source=_wikidata("Q474563")),
+            Fact(key="heritage_status", value="Rijksmonument", source=_wikidata("Q474563")),
         ],
     ),
     # A deliberately fact-less POI to exercise the "skip / non-factual" path.
@@ -95,22 +91,39 @@ def _search_radius_m(distance_km: float) -> int:
     return int(min(max(distance_km * 250, 400), 5000))
 
 
+def _wikipedia_background(title: str | None) -> tuple[str | None, Source | None]:
+    """Fetch a paraphrasable Wikipedia summary + its attribution, if enabled."""
+    if not (title and settings.enrich_wikipedia):
+        return None, None
+    try:
+        summary = wikipedia.fetch_summary(title, timeout=settings.http_timeout)
+    except ClientError:
+        return None, None
+    if summary is None:
+        return None, None
+    source = Source(name="Wikipedia", license=SourceLicense.CC_BY_SA, reference=summary.url)
+    return summary.extract, source
+
+
 def _fetch_live(near: GeoPoint, distance_km: float) -> list[POI]:
-    """Query Overpass for candidates, then enrich each with Wikidata facts."""
+    """Query Overpass for candidates, then enrich each with Wikidata + Wikipedia."""
     raw = overpass.fetch_pois(near.lat, near.lon, _search_radius_m(distance_km))
     pois: list[POI] = []
     for el in raw:
         try:
-            raw_facts = wikidata.fetch_facts(el.wikidata_id)
+            entity = wikidata.fetch_entity(el.wikidata_id)
         except ClientError:
-            raw_facts = {}  # a fact-less POI is fine — it just won't gate (PRD §8.3)
+            entity = wikidata.EntityData()  # fact-less POI is fine — it won't gate (§8.3)
         source = _wikidata(el.wikidata_id)
+        background, background_source = _wikipedia_background(entity.enwiki_title)
         pois.append(
             POI(
                 id=f"{el.osm_type}/{el.osm_id}",
                 name=el.name,
                 location=GeoPoint(lat=el.lat, lon=el.lon),
-                facts=[Fact(key=k, value=v, source=source) for k, v in raw_facts.items()],
+                facts=[Fact(key=k, value=v, source=source) for k, v in entity.facts.items()],
+                background=background,
+                background_source=background_source,
             )
         )
     return pois

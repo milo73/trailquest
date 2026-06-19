@@ -18,7 +18,11 @@ or question logic.
 **External integrations are config-gated and default to offline** so tests and a
 bare run need no network/keys/models. Switch them on via env vars (see
 `backend/README.md`):
-- `TRAILQUEST_POI_SOURCE=live` — Overpass (OSM) + Wikidata instead of the seed set.
+- `TRAILQUEST_POI_SOURCE=live` — Overpass (OSM) + Wikidata (facts incl.
+  reference-valued architect/heritage) + Wikipedia background, instead of the seed set.
+- `TRAILQUEST_CONTENT_STORE=sqlite` (+ `TRAILQUEST_CONTENT_DB_PATH`) — persist
+  generated stops (version/source/review status) so each (POI × theme) is
+  generated once and reused; default `memory` is in-process.
 - `TRAILQUEST_ROUTING_PROVIDER=osrm` (+ `TRAILQUEST_OSRM_URL`) — walking-network
   routing instead of the haversine estimate.
 - `TRAILQUEST_LLM_PROVIDER=claude_cli|ollama` — `claude_cli` uses the **Claude

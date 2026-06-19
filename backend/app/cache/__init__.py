@@ -2,9 +2,20 @@
 
 from app.cache.store import (
     ActiveTrailStore,
-    ContentCache,
+    ContentEntry,
+    ContentStore,
+    InMemoryContentStore,
+    SqliteContentStore,
     active_trails,
     content_cache,
 )
 
-__all__ = ["ActiveTrailStore", "ContentCache", "active_trails", "content_cache"]
+__all__ = [
+    "ActiveTrailStore",
+    "ContentEntry",
+    "ContentStore",
+    "InMemoryContentStore",
+    "SqliteContentStore",
+    "active_trails",
+    "content_cache",
+]

@@ -11,11 +11,12 @@ Results are cached per (POI × theme) so each generation happens once (PRD §9.3
 from __future__ import annotations
 
 from app.cache.store import content_cache
+from app.config import settings
 from app.models.schemas import (
     POI,
-    Fact,
     Question,
     QuestionType,
+    Source,
     Stop,
     Theme,
 )
@@ -27,6 +28,7 @@ _DATA_BOUND_TEMPLATES: dict[str, str] = {
     "build_year": "In which year was {name} built?",
     "build_year_start": "In which year did construction of {name} begin?",
     "founded_year": "In which year was {name} founded?",
+    "architect": "Who was the architect of {name}?",
 }
 
 
@@ -54,20 +56,26 @@ def _build_question(poi: POI) -> Question:
 
 
 def build_stop(poi: POI, theme: Theme, order: int) -> Stop:
-    """Build (or fetch from cache) the content for one stop."""
+    """Build (or fetch from the persistent store) the content for one stop.
+
+    A cache hit means this (POI × theme) was generated before — by this or any
+    prior process/user — so we never pay for the same generation twice (PRD §9.3).
+    """
     cached = content_cache.get(poi.id, theme)
     if cached is not None:
         return cached.model_copy(update={"order": order})
 
-    story = get_llm_provider().rephrase(poi_name=poi.name, theme=theme, facts=poi.facts)
+    story = get_llm_provider().rephrase(
+        poi_name=poi.name, theme=theme, facts=poi.facts, background=poi.background
+    )
     stop = Stop(order=order, poi=poi, story=story, question=_build_question(poi))
-    content_cache.put(poi.id, theme, stop)
+    content_cache.put(poi.id, theme, stop, source=f"{settings.llm_provider}:{settings.llm_model}")
     return stop
 
 
-def collect_attributions(facts: list[Fact]) -> list[str]:
+def collect_attributions(sources: list[Source]) -> list[str]:
     """Deduplicated source attributions to carry through to display (PRD §10)."""
     seen: dict[str, str] = {}
-    for fact in facts:
-        seen[fact.source.name] = f"{fact.source.name} ({fact.source.license.value})"
+    for source in sources:
+        seen[source.name] = f"{source.name} ({source.license.value})"
     return sorted(seen.values())

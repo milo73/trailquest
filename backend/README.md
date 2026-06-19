@@ -19,7 +19,8 @@ app/
   models/schemas.py     domain model + gating invariants
   clients/
     overpass.py         OSM POI retrieval (Overpass API)
-    wikidata.py         structured-fact retrieval (Wikidata)
+    wikidata.py         structured facts + enwiki title (Wikidata)
+    wikipedia.py        paraphrasable narrative summary (Wikipedia)
     osrm.py             walking-network routing (OSRM trip service)
   services/
     route_service.py    POI selection + loop building + distance/duration
@@ -28,7 +29,7 @@ app/
     answer_service.py   gating: 3 attempts then reveal, honor system for Type B
     gamification_service.py  points/bonuses
     llm/provider.py     provider-agnostic LLM (stub / claude_cli / ollama)
-  cache/store.py        content cache (POI × theme) + active-trail store
+  cache/store.py        content store (POI × theme; memory/sqlite) + trail store
 tests/                  pytest suite
 ```
 
@@ -38,8 +39,17 @@ Everything below defaults to **offline/stub** so the suite and a bare `uvicorn`
 run need no network, keys, or models. Switch on real sources via env vars.
 
 **POIs & facts** — `TRAILQUEST_POI_SOURCE=live` queries Overpass (OSM) for
-Wikidata-linked POIs in range, then pulls structured facts (build year, height)
-from Wikidata. Falls back to the bundled Haarlem seed set if Overpass fails.
+Wikidata-linked POIs in range, then pulls structured facts from Wikidata: literal
+values (build year, height) and reference-valued ones that need a label lookup
+(architect, heritage status). It also fetches a paraphrasable Wikipedia summary
+(CC BY-SA, attributed) as narrative background — never a source of gating facts.
+Disable the Wikipedia step with `TRAILQUEST_ENRICH_WIKIPEDIA=false`. Falls back to
+the bundled Haarlem seed set if Overpass fails.
+
+**Content store** — `TRAILQUEST_CONTENT_STORE=sqlite` (+ `TRAILQUEST_CONTENT_DB_PATH`)
+persists generated stops keyed by (POI × theme) with version, source, and review
+status, so each (POI × theme) is generated **once** and reused across restarts and
+users — the key cost lever (PRD §9.3). Default `memory` is in-process.
 
 **Walking routing** — `TRAILQUEST_ROUTING_PROVIDER=osrm` +
 `TRAILQUEST_OSRM_URL=<osrm-foot-server>` measures distance over the walking
@@ -86,9 +96,10 @@ mypy app                        # type-check
 
 ## Status
 
-Walking skeleton with the live integrations wired in but **off by default**:
-live OSM/Wikidata POI retrieval, OSRM walking-network routing, and Claude
-(subscription) / Ollama LLM providers all exist and are config-gated, with
-offline fallbacks. Still stubbed: a persistent content store + cache (currently
-in-memory), Wikipedia narrative enrichment, and reference-valued Wikidata facts
-(architect, heritage status — they need a second label lookup).
+Working backend with the integrations wired in but **off by default**: live
+OSM/Wikidata/Wikipedia POI retrieval (literal + reference-valued facts +
+paraphrasable background), OSRM walking-network routing, a SQLite-backed content
+store (version/source/review status), and Claude (subscription) / Ollama LLM
+providers — all config-gated with offline fallbacks. Still ahead: a curation
+review UI/workflow on top of the store's sampling hooks, batch pre-generation for
+top cities, and the React Native client.

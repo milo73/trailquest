@@ -5,7 +5,7 @@ from __future__ import annotations
 import httpx
 import pytest
 
-from app.clients import ClientError, osrm, overpass, wikidata
+from app.clients import ClientError, osrm, overpass, wikidata, wikipedia
 
 
 class _FakeResponse:
@@ -86,6 +86,50 @@ def test_wikidata_omits_missing_properties(monkeypatch: pytest.MonkeyPatch) -> N
     payload = {"entities": {"Q2": {"claims": {}}}}
     monkeypatch.setattr(wikidata.httpx, "get", lambda *a, **k: _FakeResponse(payload))
     assert wikidata.fetch_facts("Q2") == {}
+
+
+def test_wikidata_resolves_reference_facts_and_enwiki_title(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    entity = {
+        "entities": {
+            "Q1": {
+                "claims": {
+                    "P84": [
+                        {"mainsnak": {"snaktype": "value", "datavalue": {"value": {"id": "Q42"}}}}
+                    ],
+                },
+                "sitelinks": {"enwiki": {"title": "Grote Kerk (Haarlem)"}},
+            }
+        }
+    }
+    labels = {"entities": {"Q42": {"labels": {"en": {"value": "Lieven de Key"}}}}}
+
+    def fake_get(url, params, **kwargs):  # type: ignore[no-untyped-def]
+        # First call requests claims|sitelinks; the label-resolution call asks for labels.
+        return _FakeResponse(labels if params.get("props") == "labels" else entity)
+
+    monkeypatch.setattr(wikidata.httpx, "get", fake_get)
+    data = wikidata.fetch_entity("Q1")
+    assert data.facts == {"architect": "Lieven de Key"}
+    assert data.enwiki_title == "Grote Kerk (Haarlem)"
+
+
+def test_wikipedia_summary_returns_extract_and_url(monkeypatch: pytest.MonkeyPatch) -> None:
+    payload = {
+        "extract": "The Grote Kerk is a church in Haarlem.",
+        "content_urls": {"desktop": {"page": "https://en.wikipedia.org/wiki/Grote_Kerk"}},
+    }
+    monkeypatch.setattr(wikipedia.httpx, "get", lambda *a, **k: _FakeResponse(payload))
+    summary = wikipedia.fetch_summary("Grote Kerk (Haarlem)")
+    assert summary is not None
+    assert "church in Haarlem" in summary.extract
+    assert summary.url.endswith("Grote_Kerk")
+
+
+def test_wikipedia_summary_none_when_empty(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(wikipedia.httpx, "get", lambda *a, **k: _FakeResponse({"extract": ""}))
+    assert wikipedia.fetch_summary("Nothing") is None
 
 
 def test_osrm_orders_loop_and_reports_distance(monkeypatch: pytest.MonkeyPatch) -> None:
