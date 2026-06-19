@@ -1,17 +1,19 @@
 """Route service (PRD §7.3, §9.1).
 
-Selects POIs and builds a loop (start ≈ end). The MVP target is routing over the
-*walking* network (OSRM/GraphHopper/Valhalla) so distance is measured over the
-path network, not as-the-crow-flies. This skeleton uses a straight-line (haversine)
-estimate as a placeholder and selects POIs by a simple nearest-neighbour loop —
-clearly marked so it is replaced before launch.
+Selects POIs and builds a loop (start ≈ end). Distance is measured over the
+*walking* network via OSRM when ``routing_provider == "osrm"`` (PRD §7.3); the
+OSRM `trip` service also optimizes the stop order. Without a routing server it
+falls back to a straight-line (haversine) nearest-neighbour loop — a usable
+estimate, clearly marked, that over/under-states real walking distance.
 """
 
 from __future__ import annotations
 
+import logging
 import uuid
 from math import asin, cos, radians, sin, sqrt
 
+from app.clients import ClientError, osrm
 from app.config import settings
 from app.models.schemas import (
     POI,
@@ -21,6 +23,8 @@ from app.models.schemas import (
     TrailRequest,
 )
 from app.services import content_service, poi_service
+
+logger = logging.getLogger(__name__)
 
 
 def _haversine_km(a: GeoPoint, b: GeoPoint) -> float:
@@ -50,6 +54,29 @@ def _loop_distance_km(start: GeoPoint, ordered: list[POI]) -> float:
     return sum(_haversine_km(points[i], points[i + 1]) for i in range(len(points) - 1))
 
 
+def _order_and_measure(start: GeoPoint, selected: list[POI]) -> tuple[list[POI], float]:
+    """Order stops into a loop and return (ordered_pois, loop_distance_km).
+
+    Uses OSRM's walking-network `trip` service when configured, falling back to
+    the haversine nearest-neighbour estimate on any routing failure.
+    """
+    if not selected:
+        return [], 0.0
+
+    if settings.routing_provider == "osrm":
+        try:
+            points = [(start.lat, start.lon), *[(p.location.lat, p.location.lon) for p in selected]]
+            trip = osrm.optimized_loop(points)
+            # trip.order is over points (index 0 == start); map the rest to POIs.
+            ordered = [selected[i - 1] for i in trip.order if i != 0]
+            return ordered, trip.distance_km
+        except ClientError as exc:
+            logger.warning("OSRM routing failed (%s); using haversine estimate", exc)
+
+    ordered = _nearest_neighbour_loop(start, selected)
+    return ordered, round(_loop_distance_km(start, ordered), 2)
+
+
 def _select_pois(candidates: list[POI], distance_km: float) -> list[POI]:
     """Pick POIs with verifiable facts, roughly one stop per kilometre.
 
@@ -64,13 +91,12 @@ def generate_trail(req: TrailRequest) -> Trail:
     """Generate a full trail for the request (the thin end-to-end vertical)."""
     candidates = poi_service.candidates(req.start, req.distance_km)
     selected = _select_pois(candidates, req.distance_km)
-    ordered = _nearest_neighbour_loop(req.start, selected)
+    ordered, actual_km = _order_and_measure(req.start, selected)
 
     stops = [
         content_service.build_stop(poi, req.theme, order=i + 1) for i, poi in enumerate(ordered)
     ]
 
-    actual_km = round(_loop_distance_km(req.start, ordered), 2)
     walk_min = (actual_km / settings.walking_speed_kmh) * 60
     duration_min = round(walk_min + len(stops) * settings.minutes_per_stop)
 

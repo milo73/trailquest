@@ -15,6 +15,19 @@ can be split out later. The domain model in `backend/app/models/schemas.py`
 encodes the content-accuracy constraint below — read it before touching content
 or question logic.
 
+**External integrations are config-gated and default to offline** so tests and a
+bare run need no network/keys/models. Switch them on via env vars (see
+`backend/README.md`):
+- `TRAILQUEST_POI_SOURCE=live` — Overpass (OSM) + Wikidata instead of the seed set.
+- `TRAILQUEST_ROUTING_PROVIDER=osrm` (+ `TRAILQUEST_OSRM_URL`) — walking-network
+  routing instead of the haversine estimate.
+- `TRAILQUEST_LLM_PROVIDER=claude_cli|ollama` — `claude_cli` uses the **Claude
+  Pro/Max subscription** via the Claude Code CLI (no API key; see the caveat in
+  the README), `ollama` uses a local server. Default `stub` is an offline echo.
+
+Outbound clients live in `app/clients/` and raise `ClientError`; services catch
+it and fall back (seed POIs, haversine) — degrade rather than break (PRD §13).
+
 ### Backend commands (run from `backend/`)
 
 ```bash
