@@ -82,7 +82,7 @@ TrailQuest combineert *generatief op maat* + *verhaal* + *gamification* + *vanaf
 - Augmented Reality
 - Community-routes (door gebruikers gepubliceerd)
 - Volledige offline-modus
-- Accounts overslaan kan in MVP (gastmodus) — zie open vragen
+- Gastmodus in MVP: spelen kan zonder account (zie §19)
 
 ---
 
@@ -113,7 +113,7 @@ TrailQuest combineert *generatief op maat* + *verhaal* + *gamification* + *vanaf
 ### Belangrijke alternatieve paden
 - **Geen/weinig POI's in straal** → app stelt grotere straal, ander thema of "gemengd" voor (zie §13).
 - **GPS-drift / aankomst niet gedetecteerd** → handmatige "Ik ben er"-knop met plausibiliteitscheck.
-- **Verkeerd antwoord** → hint na poging 1, antwoord onthullen + door na poging _n_ (geen doodlopend spel).
+- **Verkeerd antwoord** → hint na poging 1, antwoord onthullen + door na 3 pogingen (geen doodlopend spel; stops zijn niet skipbaar).
 - **Verbinding weg** → reeds gegenereerde tocht blijft bruikbaar via lokale cache (zie §9, §11).
 
 ---
@@ -199,7 +199,7 @@ Model-agnostische abstractielaag (provider-onafhankelijk), zodat tussen aanbiede
 ## 9. Technische architectuur
 
 ### 9.1 Componenten
-- **Client (mobiel):** React Native of Flutter. Kaart, navigatie, geofencing, content-weergave, lokale cache van de actieve tocht.
+- **Client (mobiel):** React Native. Kaart, navigatie, geofencing, content-weergave, lokale cache van de actieve tocht.
 - **API / gateway:** auth, rate limiting, orkestratie.
 - **Route-service:** POI-selectie + routing over wandelnetwerk (OSRM/GraphHopper/Valhalla).
 - **POI-/data-service:** ophalen + normaliseren van POI's en feiten (OSM/Wikidata/Wikipedia), met eigen cache.
@@ -275,7 +275,7 @@ Ontwerpbeslissing: **OSM + Wikidata als basis** (kosten + licentie gunstig), Wik
 | Te weinig POI's in straal (platteland/dun gebied) | Stel grotere straal, "gemengd" thema, of natuur-thema voor; wees eerlijk over dekking |
 | Geen verifieerbare feiten voor een POI | POI overslaan of niet-feitelijk verhaal; nooit verzinnen |
 | Aankomst niet gedetecteerd (GPS-drift) | "Ik ben er"-knop met plausibiliteitscheck |
-| Verkeerd antwoord | Hint na poging 1; antwoord onthullen + doorgaan na poging _n_ |
+| Verkeerd antwoord | Hint na poging 1; antwoord onthullen + doorgaan na 3 pogingen (geen stop overslaan) |
 | Verbinding valt weg | Actieve tocht draait door op cache; sync later |
 | Doelafstand niet haalbaar (eilandje van paden) | Beste benadering + transparante melding over afwijking |
 | Ongepaste/twijfelachtige gegenereerde content | Filter vooraf; feedbackknop; review-flag |
@@ -356,16 +356,20 @@ Aanbeveling: start consumenten-**freemium** + verken **B2B/B2G** vroeg (hogere b
 
 ---
 
-## 19. Open vragen / te nemen beslissingen
+## 19. Genomen beslissingen
 
-1. **Account verplicht of gastmodus?** (retentie/gamification vs. drempel)
-2. **Eerste launch-stad(en)?** (bepaalt content-investering en GTM)
-3. **Frontend:** React Native of Flutter — teamcompetentie beslist.
-4. **Kaart-stack:** OSM-tiles (kosten) vs. Mapbox/Google (kwaliteit/geocoding) — wat is de kwaliteitsondergrens?
-5. **Gating-strengheid:** hoeveel pogingen vóór onthullen? Mag een gebruiker stops overslaan?
-6. **Curatie-model:** puur AI + steekproef, of mens-in-the-loop voor top-POI's vanaf dag 1?
-7. **Tijd- i.p.v. afstand-invoer** al in MVP?
-8. **Monetisatie-prioriteit:** consument-first of B2B/B2G-first?
+De openstaande vragen uit eerdere versies zijn als volgt besloten:
+
+| # | Vraag | Beslissing | Implicatie |
+|---|---|---|---|
+| 1 | Account verplicht of gastmodus? | **Gastmodus** — spelen kan zonder account | Lagere drempel; gamification/historie koppelen aan optioneel later aan te maken account |
+| 2 | Eerste launch-stad(en)? | **Haarlem** | Content-investering + GTM richten op Haarlem; veel verifieerbare POI's, compact wandelbaar centrum |
+| 3 | Frontend | **React Native** | Eén codebase iOS/Android; kaart-, geofencing- en cache-libraries kiezen binnen RN-ecosysteem |
+| 4 | Kaart-stack | **Gratis optie (bv. Google Maps free tier)** | Start op een kosteloos kaart-/geocoding-aanbod; bewaak gebruikslimieten; OSM blijft bron voor POI's/routing |
+| 5 | Gating-strengheid | **3 pogingen vóór onthullen; geen stops overslaan** | Na 3 foute pogingen wordt het antwoord onthuld en gaat de tocht door; stops zijn niet skipbaar (lineaire voortgang) |
+| 6 | Curatie-model | **Puur AI + steekproef** | Geen mens-in-the-loop per POI in MVP; steekproefsgewijze controle + feedbackknop voeden correctie |
+| 7 | Tijd- i.p.v. afstand-invoer in MVP? | **Nee** | MVP is uitsluitend afstand-gebaseerd; tijd-invoer is roadmap |
+| 8 | Monetisatie-prioriteit | **Consument-first** | Start met consumenten-freemium; B2B/B2G later verkennen |
 
 ---
 
