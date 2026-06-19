@@ -31,11 +31,19 @@ class Settings(BaseSettings):
     ollama_url: str = "http://localhost:11434"
     ollama_model: str = "llama3.1"
 
+    # Content store + cache (PRD §9.1, §9.3). "memory" is in-process (tests);
+    # "sqlite" persists generated content (with version/source/review status) so
+    # generation happens once and survives restarts.
+    content_store: str = "memory"
+    content_db_path: str = "trailquest_content.db"
+
     # POI / data source (PRD §10). "seed" uses the bundled Haarlem set (offline,
     # used by tests); "live" queries Overpass (OSM) + Wikidata.
     poi_source: str = "seed"
     overpass_url: str = "https://overpass-api.de/api/interpreter"
     wikidata_api_url: str = "https://www.wikidata.org/w/api.php"
+    # Paraphrasable Wikipedia background for live POIs (CC BY-SA, attributed).
+    enrich_wikipedia: bool = True
 
     # Walking-network routing (PRD §7.3). "none" falls back to a straight-line
     # estimate; "osrm" uses an OSRM-compatible server with the foot profile.

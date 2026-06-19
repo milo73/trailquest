@@ -100,8 +100,9 @@ def generate_trail(req: TrailRequest) -> Trail:
     walk_min = (actual_km / settings.walking_speed_kmh) * 60
     duration_min = round(walk_min + len(stops) * settings.minutes_per_stop)
 
-    all_facts = [f for s in stops for f in s.poi.facts]
-    attributions = content_service.collect_attributions(all_facts)
+    sources = [f.source for s in stops for f in s.poi.facts]
+    sources += [s.poi.background_source for s in stops if s.poi.background_source is not None]
+    attributions = content_service.collect_attributions(sources)
     # OSM attribution is always required when its data underpins routing (PRD §10).
     osm_attr = "OpenStreetMap (ODbL)"
     if osm_attr not in attributions:

@@ -33,31 +33,43 @@ from app.models.schemas import Fact, Theme
 
 _SYSTEM_PROMPT = (
     "You are a local guide writing a short, vivid stop description for a walking "
-    "scavenger hunt. You will be given a place name, a theme, and a list of "
-    "verified facts. Use ONLY those facts. Do not invent dates, numbers, names, "
-    "or any other verifiable detail. If a detail is not in the facts, leave it "
-    "out. Keep it to 2-3 sentences and match the requested theme's tone."
+    "scavenger hunt. You will be given a place name, a theme, a list of verified "
+    "facts, and optionally some background to draw on. For any verifiable detail "
+    "(dates, numbers, names) use ONLY the verified facts — invent nothing and "
+    "leave out anything not given. You may paraphrase the background for colour, "
+    "but never copy it verbatim and never treat it as a source of new facts. Keep "
+    "it to 2-3 sentences and match the requested theme's tone."
 )
 
 
-def _build_prompt(poi_name: str, theme: Theme, facts: list[Fact]) -> str:
+def _build_prompt(poi_name: str, theme: Theme, facts: list[Fact], background: str | None) -> str:
     fact_lines = "\n".join(f"- {f.key.replace('_', ' ')}: {f.value}" for f in facts)
-    return (
+    prompt = (
         f"Place: {poi_name}\n"
         f"Theme: {theme.value}\n"
-        f"Verified facts (use only these):\n{fact_lines}\n\n"
-        "Write the stop description now."
+        f"Verified facts (use only these for verifiable claims):\n{fact_lines}\n"
     )
+    if background:
+        prompt += (
+            f"\nBackground to paraphrase (do not copy, do not extract new facts):\n{background}\n"
+        )
+    return prompt + "\nWrite the stop description now."
 
 
 class LLMProvider(ABC):
     """Abstract base for all LLM providers."""
 
-    def rephrase(self, *, poi_name: str, theme: Theme, facts: list[Fact]) -> str:
-        """Produce a grounded narrative for a stop using ONLY ``facts``."""
-        if not facts:
+    def rephrase(
+        self, *, poi_name: str, theme: Theme, facts: list[Fact], background: str | None = None
+    ) -> str:
+        """Produce a grounded narrative for a stop using ONLY ``facts``.
+
+        ``background`` (e.g. a Wikipedia summary) may be paraphrased for colour
+        but is never a source of verifiable facts (PRD §8.1).
+        """
+        if not facts and not background:
             return f"{poi_name} is part of your trail."
-        prompt = _build_prompt(poi_name, theme, facts)
+        prompt = _build_prompt(poi_name, theme, facts, background)
         return self.complete(system=_SYSTEM_PROMPT, prompt=prompt).strip()
 
     @abstractmethod
@@ -72,7 +84,9 @@ class StubProvider(LLMProvider):
     contract: no facts in, no facts out.
     """
 
-    def rephrase(self, *, poi_name: str, theme: Theme, facts: list[Fact]) -> str:
+    def rephrase(
+        self, *, poi_name: str, theme: Theme, facts: list[Fact], background: str | None = None
+    ) -> str:
         if not facts:
             return f"{poi_name} is part of your trail."
         rendered = "; ".join(f"{f.key.replace('_', ' ')}: {f.value}" for f in facts)
