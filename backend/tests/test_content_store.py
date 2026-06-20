@@ -5,7 +5,17 @@ from __future__ import annotations
 import pytest
 
 from app.cache.store import InMemoryContentStore, SqliteContentStore
-from app.models.schemas import POI, GeoPoint, Question, QuestionType, Stop, Theme
+from app.models.schemas import (
+    POI,
+    Fact,
+    GeoPoint,
+    Question,
+    QuestionType,
+    Source,
+    SourceLicense,
+    Stop,
+    Theme,
+)
 
 
 def _stop(order: int = 1, story: str = "A grounded story.") -> Stop:
@@ -70,3 +80,38 @@ def test_content_service_caches_generation(monkeypatch: pytest.MonkeyPatch) -> N
     content_service.build_stop(poi, Theme.MIXED, order=1)
     content_service.build_stop(poi, Theme.MIXED, order=5)  # cache hit
     assert calls["n"] == 1  # generated only once
+
+
+def test_build_stop_degrades_when_llm_fails(monkeypatch: pytest.MonkeyPatch) -> None:
+    """An LLM provider failure must degrade, not break, and must not poison the cache.
+
+    On a RuntimeError from the provider (offline/timeout/CLI missing), build_stop
+    serves a deterministic, still-grounded story (PRD §13) and does NOT cache it,
+    so a later run can regenerate with the real provider (PRD §9.3).
+    """
+    from app.cache.store import content_cache
+    from app.services import content_service
+    from app.services.llm.provider import LLMProvider
+
+    content_cache.clear()
+
+    class FailingProvider(LLMProvider):
+        def complete(self, *, system: str, prompt: str) -> str:
+            raise RuntimeError("Ollama request failed: timed out")
+
+    # The configured provider fails the way a live one would (timeout); the
+    # deterministic StubProvider fallback stays intact.
+    monkeypatch.setattr(content_service, "get_llm_provider", lambda: FailingProvider())
+    monkeypatch.setattr(content_service.settings, "llm_provider", "ollama")
+
+    fact = Fact(
+        key="build_year",
+        value="1779",
+        source=Source(name="Wikidata", license=SourceLicense.CC0, reference="wikidata:Q1"),
+    )
+    poi = POI(id="node/42", name="Molen", location=GeoPoint(lat=52.0, lon=4.0), facts=[fact])
+
+    stop = content_service.build_stop(poi, Theme.HISTORICAL, order=1)
+
+    assert "1779" in stop.story  # grounded fallback, not a 500
+    assert content_cache.get("node/42", Theme.HISTORICAL) is None  # not cached

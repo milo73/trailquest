@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     claude_cli_path: str = "claude"
     # Local Ollama server + model (used by the ollama provider).
     ollama_url: str = "http://localhost:11434"
-    ollama_model: str = "llama3.1"
+    ollama_model: str = "qwen3.5:27b"
 
     # Content store + cache (PRD §9.1, §9.3). "memory" is in-process (tests);
     # "sqlite" persists generated content (with version/source/review status) so

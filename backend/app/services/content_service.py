@@ -21,6 +21,7 @@ from app.models.schemas import (
     Theme,
 )
 from app.services.llm import get_llm_provider
+from app.services.llm.provider import StubProvider
 
 # Fact keys we know how to turn into a data-bound (Type-A) question, with phrasing.
 _DATA_BOUND_TEMPLATES: dict[str, str] = {
@@ -65,10 +66,22 @@ def build_stop(poi: POI, theme: Theme, order: int) -> Stop:
     if cached is not None:
         return cached.model_copy(update={"order": order})
 
-    story = get_llm_provider().rephrase(
-        poi_name=poi.name, theme=theme, facts=poi.facts, background=poi.background
-    )
-    stop = Stop(order=order, poi=poi, story=story, question=_build_question(poi))
+    question = _build_question(poi)
+    try:
+        story = get_llm_provider().rephrase(
+            poi_name=poi.name, theme=theme, facts=poi.facts, background=poi.background
+        )
+    except RuntimeError:
+        # The LLM provider failed (offline, timeout, CLI missing). Degrade rather
+        # than break (PRD §13): serve a deterministic, still-grounded story from
+        # the stub. Do NOT cache it — a one-off failure must not poison the
+        # (POI × theme) entry; a later run can regenerate with the real provider.
+        story = StubProvider().rephrase(
+            poi_name=poi.name, theme=theme, facts=poi.facts, background=poi.background
+        )
+        return Stop(order=order, poi=poi, story=story, question=question)
+
+    stop = Stop(order=order, poi=poi, story=story, question=question)
     content_cache.put(poi.id, theme, stop, source=f"{settings.llm_provider}:{settings.llm_model}")
     return stop
 
