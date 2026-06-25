@@ -2,25 +2,12 @@ import { useState } from "react";
 import { StudioChrome } from "../StudioChrome";
 import { VALIDATION_REPORT } from "../mock/validation";
 
-/**
- * CSS-content helpers: render text via attr() so it stays out of
- * getNodeText() in testing-library, preventing false multi-matches
- * in queries like getByText(/1/) or getByText(/Molen De Adriaan/).
- * Visual rendering is identical; DOM text nodes are absent.
- */
-const CSS_RULES = `
-  .tq-val-detail::before  { content: attr(data-text); }
-  .tq-val-ps-name::before { content: attr(data-name); }
-  .tq-val-ps-order::before{ content: attr(data-order); }
-`;
-
 export function Validation() {
   const report = VALIDATION_REPORT;
   const [published, setPublished] = useState(false);
 
   return (
     <StudioChrome breadcrumb="publiceren">
-      <style>{CSS_RULES}</style>
       <div
         style={{
           height: 782,
@@ -63,6 +50,7 @@ export function Validation() {
 
           {/* Checks list */}
           <div
+            data-testid="checks-list"
             style={{
               display: "flex",
               flexDirection: "column",
@@ -135,16 +123,15 @@ export function Validation() {
                     >
                       {check.label}
                     </div>
-                    {/* Detail rendered via CSS attr() — keeps getNodeText() clean for test queries */}
                     <div
-                      className="tq-val-detail"
-                      data-text={check.detail}
                       style={{
                         font: "500 12px/1.4 var(--tq-sans)",
                         color: isWarning ? "#a3781f" : "#8a7f6d",
                         marginTop: isWarning ? 4 : 3,
                       }}
-                    />
+                    >
+                      {check.detail}
+                    </div>
 
                     {/* Warning resolution buttons */}
                     {isWarning && (
@@ -263,6 +250,7 @@ export function Validation() {
               </div>
             </div>
             <div
+              data-testid="warning-count-card"
               style={{
                 flex: 1,
                 background: "rgba(255,255,255,.07)",
@@ -343,16 +331,9 @@ export function Validation() {
                     <path d="M12 3 22 20H2Z" />
                   </svg>
                 )}
-                {/* Order + name rendered via CSS attr() to avoid text-node collisions in queries */}
-                <span
-                  className="tq-val-ps-order"
-                  data-order={String(stop.order)}
-                />
+                <span>{stop.order}</span>
                 {" · "}
-                <span
-                  className="tq-val-ps-name"
-                  data-name={stop.name}
-                />
+                <span>{stop.name}</span>
                 <span
                   style={{
                     marginLeft: "auto",
