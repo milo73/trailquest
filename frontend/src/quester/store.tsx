@@ -57,7 +57,6 @@ export function QuesterProvider({ children }: { children: React.ReactNode }) {
   }, [state]);
 
   const api = useMemo<QuesterApi>(() => {
-    const orders = () => (state.trail?.stops.map((s) => s.order) ?? []);
     return {
       state,
       setConfig: (partial) => setState((s) => ({ ...s, config: { ...s.config, ...partial } })),
