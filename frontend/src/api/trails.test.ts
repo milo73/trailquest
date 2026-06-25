@@ -1,6 +1,5 @@
 import { afterEach, expect, test, vi } from "vitest";
 import { createTrail, submitAnswer } from "./trails";
-import { ApiError } from "./client";
 
 afterEach(() => vi.restoreAllMocks());
 
