@@ -6,3 +6,4 @@ export { StatTile } from "./StatTile";
 export { SourceBadge } from "./SourceBadge";
 export { PhoneFrame } from "./PhoneFrame";
 export { SegmentedControl } from "./SegmentedControl";
+export { MapCanvas } from "./MapCanvas";
