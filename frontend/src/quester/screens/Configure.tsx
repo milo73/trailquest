@@ -249,21 +249,6 @@ export function Configure() {
                 </button>
               );
             })}
-            <button
-              style={{
-                flex: 1.5,
-                textAlign: "center",
-                padding: "10px 0",
-                borderRadius: 10,
-                border: "1px dashed #cbbfa6",
-                background: "transparent",
-                font: "500 12px/1 'DM Sans'",
-                color: "#8a7f6d",
-                cursor: "pointer",
-              }}
-            >
-              km · Custom
-            </button>
           </div>
         </div>
 
