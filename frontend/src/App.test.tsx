@@ -8,5 +8,5 @@ test("renders the studio route", () => {
       <App />
     </MemoryRouter>,
   );
-  expect(screen.getByText("Trail Creator")).toBeInTheDocument();
+  expect(screen.getByText("Haarlems Gouden Eeuw")).toBeInTheDocument();
 });
