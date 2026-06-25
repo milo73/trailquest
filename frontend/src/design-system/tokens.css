@@ -1,0 +1,29 @@
+:root {
+  --tq-terracotta: #b5453a;
+  --tq-terracotta-deep: #963a30;
+  --tq-navy: #283a5e;
+  --tq-ink: #211f1b;
+  --tq-cream: #f3ede0;
+  --tq-paper: #faf6ec;
+  --tq-sand: #ece2cf;
+  --tq-border: #e0d5bf;
+  --tq-muted: #8a7f6d;
+  --tq-green: #6f8a4f;
+  --tq-green-bg: #e7eed7;
+  --tq-green-ink: #3a5a2f;
+  --tq-gold: #c5912f;
+  --tq-gold-bg: #f8efda;
+  --tq-gold-ink: #a3781f;
+  --tq-osm-bg: #e3e8f1;
+  --tq-osm-ink: #5a6a8a;
+  --tq-serif: "DM Serif Display", Georgia, serif;
+  --tq-sans: "DM Sans", system-ui, sans-serif;
+  --tq-mono: "Spline Sans Mono", ui-monospace, monospace;
+  --tq-display: "Bricolage Grotesque", var(--tq-sans);
+  --tq-shadow-card: 0 40px 80px -34px rgba(33, 31, 27, 0.5), 0 0 0 1px rgba(40, 30, 20, 0.06);
+  --tq-shadow-bezel: 0 30px 60px -22px rgba(33, 31, 27, 0.55), 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+* { box-sizing: border-box; }
+body { margin: 0; font-family: var(--tq-sans); color: var(--tq-ink); background: #f0eee9; }
+@keyframes tqpulse { 0% { transform: scale(1); opacity: 0.55; } 70% { transform: scale(2.6); opacity: 0; } 100% { opacity: 0; } }
+@keyframes tqdash { to { stroke-dashoffset: -28; } }
