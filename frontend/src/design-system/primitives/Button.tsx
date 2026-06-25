@@ -3,8 +3,8 @@ import type { ButtonHTMLAttributes } from "react";
 type Variant = "primary" | "secondary" | "ghost";
 
 const styles: Record<Variant, React.CSSProperties> = {
-  primary: { background: "var(--tq-terracotta)", color: "#fff", border: "none" },
-  secondary: { background: "transparent", color: "var(--tq-navy)", border: "1px solid #cbbfa6" },
+  primary: { background: "var(--tq-terracotta)", color: "var(--tq-white)", border: "none" },
+  secondary: { background: "transparent", color: "var(--tq-navy)", border: "1px solid var(--tq-border-strong)" },
   ghost: { background: "transparent", color: "var(--tq-muted)", border: "none" },
 };
 

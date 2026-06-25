@@ -22,6 +22,17 @@
   --tq-display: "Bricolage Grotesque", var(--tq-sans);
   --tq-shadow-card: 0 40px 80px -34px rgba(33, 31, 27, 0.5), 0 0 0 1px rgba(40, 30, 20, 0.06);
   --tq-shadow-bezel: 0 30px 60px -22px rgba(33, 31, 27, 0.55), 0 0 0 1px rgba(0, 0, 0, 0.35);
+  --tq-white: #fff;
+  --tq-border-strong: #cbbfa6;
+  --tq-neutral-text: #6b6256;
+  --tq-terracotta-tint-bg: #fbeee6;
+  --tq-terracotta-tint-border: #e8c3bb;
+  --tq-green-border: #cdd9b3;
+  --tq-gold-border: #e6cf9a;
+  --tq-wikipedia-ink: #7d6a3f;
+  --tq-wikipedia-bg: #f1e8d4;
+  --tq-wikipedia-border: #ddccaa;
+  --tq-osm-border: #c6cfdf;
 }
 * { box-sizing: border-box; }
 body { margin: 0; font-family: var(--tq-sans); color: var(--tq-ink); background: #f0eee9; }

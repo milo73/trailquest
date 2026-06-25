@@ -8,9 +8,9 @@ function toneFor(name: string): Tone {
 }
 
 const palette: Record<Tone, React.CSSProperties> = {
-  wikidata: { color: "var(--tq-green-ink)", background: "var(--tq-green-bg)", borderColor: "#cdd9b3" },
-  wikipedia: { color: "#7d6a3f", background: "#f1e8d4", borderColor: "#ddccaa" },
-  osm: { color: "var(--tq-osm-ink)", background: "var(--tq-osm-bg)", borderColor: "#c6cfdf" },
+  wikidata: { color: "var(--tq-green-ink)", background: "var(--tq-green-bg)", borderColor: "var(--tq-green-border)" },
+  wikipedia: { color: "var(--tq-wikipedia-ink)", background: "var(--tq-wikipedia-bg)", borderColor: "var(--tq-wikipedia-border)" },
+  osm: { color: "var(--tq-osm-ink)", background: "var(--tq-osm-bg)", borderColor: "var(--tq-osm-border)" },
 };
 
 export function SourceBadge({ source }: { source: { name: string } }) {
