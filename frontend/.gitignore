@@ -1,3 +1,8 @@
 node_modules/
 dist/
 *.local
+
+# TypeScript build-mode artifacts (emitted by `tsc -b` for the composite vite config project)
+*.tsbuildinfo
+vite.config.js
+vite.config.d.ts
