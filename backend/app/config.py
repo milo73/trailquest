@@ -37,6 +37,11 @@ class Settings(BaseSettings):
     content_store: str = "memory"
     content_db_path: str = "trailquest_content.db"
 
+    # Studio draft trails. "memory" (default, tests) is in-process; "file"
+    # persists each draft as JSON under draft_store_path so drafts survive restarts.
+    draft_store: str = "memory"
+    draft_store_path: str = "drafts"
+
     # POI / data source (PRD §10). "seed" uses the bundled Haarlem set (offline,
     # used by tests); "live" queries Overpass (OSM) + Wikidata.
     poi_source: str = "seed"
