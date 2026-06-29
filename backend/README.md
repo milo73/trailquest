@@ -30,6 +30,7 @@ app/
     gamification_service.py  points/bonuses
     llm/provider.py     provider-agnostic LLM (stub / claude_cli / ollama)
   cache/store.py        content store (POI × theme; memory/sqlite) + trail store
+  cache/draft_store.py  draft trail store (memory/file)
 tests/                  pytest suite
 ```
 
@@ -50,6 +51,10 @@ the bundled Haarlem seed set if Overpass fails.
 persists generated stops keyed by (POI × theme) with version, source, and review
 status, so each (POI × theme) is generated **once** and reused across restarts and
 users — the key cost lever (PRD §9.3). Default `memory` is in-process.
+
+**Draft store** — `TRAILQUEST_DRAFT_STORE=file` (+ `TRAILQUEST_DRAFT_STORE_PATH`,
+default `drafts.json`) persists creator-studio drafts across restarts. Default
+`memory` is in-process and drafts are lost on restart.
 
 **Walking routing** — `TRAILQUEST_ROUTING_PROVIDER=osrm` +
 `TRAILQUEST_OSRM_URL=<osrm-foot-server>` measures distance over the walking
@@ -93,6 +98,21 @@ ruff check .                    # lint
 ruff format .                   # format
 mypy app                        # type-check
 ```
+
+## API endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/health` | Liveness check |
+| `POST` | `/trails` | Generate a full trail (route + content) |
+| `GET` | `/trails/{id}` | Fetch a persisted generated trail |
+| `POST` | `/trails/{id}/stops/{idx}/answer` | Check answer for a stop (gating) |
+| `GET` | `/pois` | List candidate POIs near a location (query params: `lat`, `lon`, `radius_km`) |
+| `POST` | `/routes/measure` | Compute walking distance/duration for an ordered list of coordinates |
+| `POST` | `/drafts` | Create a new draft trail |
+| `GET` | `/drafts` | List all draft trails |
+| `GET` | `/drafts/{id}` | Fetch a single draft trail |
+| `PUT` | `/drafts/{id}` | Update a draft trail (title, stops, status, etc.) |
 
 ## Status
 

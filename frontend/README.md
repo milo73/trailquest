@@ -69,7 +69,7 @@ cd frontend && npm run dev
 #   http://localhost:5173/studio  — creator studio (mock data)
 ```
 
-Without the backend running, visiting `/play` and clicking "Genereer speurtocht" will show the degrade error message (this is expected — the backend is required for trail generation). The `/studio` surface renders fully on mock data and does not require the backend except for the "Genereer concept" button which calls `POST /trails`.
+Without the backend running, visiting `/play` and clicking "Genereer speurtocht" will show the degrade error message (this is expected — the backend is required for trail generation). The `/studio` dashboard and route editor will show empty or error states for drafts; the Stop editor and Validation screens still render on local state. The backend is required for draft creation, the POI picker, and the distance meter.
 
 ---
 
@@ -126,14 +126,25 @@ src/
 | Answer checking (`POST /trails/{id}/stops/{idx}/answer`) | yes | — |
 | Points and badges | — | yes (`gamification.ts`) |
 | Star rating | — | yes (local state) |
-| Studio data (trails, stops) | — | yes (mock seed) |
+| Studio drafts (`POST/GET/PUT /drafts`) | yes | — |
+| Studio POI catalog (`GET /pois`) | yes | — |
+| Studio route measurement (`POST /routes/measure`) | yes | — |
 | Studio "Genereer concept" | yes | — |
+
+### Studio route creation
+
+The creator studio now manages real draft trails backed by the FastAPI backend:
+
+- **Draft persistence** — "Nieuwe tocht maken" (`/studio`) calls `POST /drafts` to create a server-side draft and navigates to `/studio/route`. The draft is persisted on the server and survives a full browser reload.
+- **POI catalog** — the "+ Stop toevoegen" picker fetches real Haarlem POIs from `GET /pois`. Without the backend running this call fails and the picker shows an empty list.
+- **Live distance meter** — after every stop addition, removal, or reorder the editor calls `POST /routes/measure` and updates the km / min display. Distance is a walking-network estimate (haversine if OSRM is not configured).
+- **Degraded offline state** — without the backend running, the studio dashboard and route editor show empty or error states for drafts (they degrade gracefully, they do not crash). The Stop editor and Validation screens remain fully functional on local state.
 
 ---
 
 ## Automated smoke results
 
-Run against commit on branch `feat/frontend-quester-studio`.
+Run against commit on branch `feat/studio-route-creation`.
 
 ### Typecheck (`npm run typecheck`)
 
@@ -145,12 +156,13 @@ exit 0
 ### Tests (`npm test`)
 
 ```
-Test Files  17 passed (17)
-      Tests  29 passed (29)
-   Duration  ~1s
+Test Files  20 passed (20)
+      Tests  38 passed (38)
+   Duration  ~1.2s
 ```
 
 Test files:
+- `src/api/drafts.test.ts` (3)
 - `src/api/trails.test.ts` (2)
 - `src/quester/gamification.test.ts` (5)
 - `src/quester/store.test.tsx` (3)
@@ -163,9 +175,11 @@ Test files:
 - `src/design-system/primitives/MapCanvas.test.tsx` (1)
 - `src/design-system/primitives/SegmentedControl.test.tsx` (1)
 - `src/design-system/primitives/SourceBadge.test.tsx` (2)
-- `src/studio/screens/Dashboard.test.tsx` (1)
+- `src/studio/components/PoiPicker.test.tsx` (1)
+- `src/studio/draftStore.test.tsx` (3)
+- `src/studio/screens/Dashboard.test.tsx` (2)
 - `src/studio/screens/RouteEditor.test.tsx` (2)
-- `src/studio/screens/StopEditor.test.tsx` (3)
+- `src/studio/screens/StopEditor.test.tsx` (4)
 - `src/studio/screens/Validation.test.tsx` (1)
 - `src/App.test.tsx` (1)
 
@@ -175,11 +189,11 @@ Note: React Router v6 emits two "Future Flag Warning" lines during studio and pl
 
 ```
 vite v5.4.21 building for production...
-✓ 64 modules transformed.
+68 modules transformed.
 dist/index.html                   0.40 kB │ gzip:  0.27 kB
 dist/assets/index-DSq2xkZK.css    1.31 kB │ gzip:  0.64 kB
-dist/assets/index-DX8c6yZb.js   238.69 kB │ gzip: 69.59 kB
-✓ built in 296ms
+dist/assets/index-Cx8AmG5x.js   245.90 kB │ gzip: 71.26 kB
+built in 305ms
 exit 0
 ```
 
@@ -203,10 +217,22 @@ Run these manually after `npm run dev` with the backend running (see above).
   - Wrong answer: feedback shown; after 3 attempts the answer is revealed and progress continues (stops are not skippable — PRD §19)
 - [ ] Complete all stops; finish screen shows points earned and any badges
 
-### Studio
+### Studio — existing trails
 
 - [ ] Open `http://localhost:5173/studio`
-- [ ] Dashboard renders trail cards with stats (mock data)
-- [ ] Click a trail → Route editor shows stop list; use move-up/down controls to reorder
+- [ ] Dashboard shows existing draft trail cards with stats (from server)
+- [ ] Click a trail card → Route editor shows the stop list; use move-up/down controls to reorder — distance meter updates after each change
 - [ ] Open Stop editor for a stop; change question type to **Type B** — verify the "Gate" toggle disables automatically
 - [ ] Open Validation screen; review pre-publish warnings; click "Publiceer" → confirmation shown
+
+### Studio — route creation (new)
+
+- [ ] Open `http://localhost:5173/studio`
+- [ ] Click "Nieuwe tocht maken" — navigates to `/studio/route` with an empty draft
+- [ ] Click "+ Stop toevoegen" — a picker dialog opens and lists real Haarlem POIs fetched from `GET /pois`
+- [ ] Select two POIs — they appear in the stop list and the distance/duration meter shows a non-zero value from `POST /routes/measure`
+- [ ] Reorder the stops using the move-up/down controls — the meter updates after each change
+- [ ] Remove a stop — meter updates
+- [ ] Click a stop row to open the Stop editor for that stop
+- [ ] Reload the page (`F5`) — the draft reloads from the server and the stop list is intact
+- [ ] Navigate back to `/studio` — the draft appears in the dashboard card list

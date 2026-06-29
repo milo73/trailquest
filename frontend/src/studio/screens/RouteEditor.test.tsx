@@ -45,7 +45,7 @@ test("renders real draft stops and the measured distance", async () => {
 test("opening the picker and choosing a candidate calls addStop (PUT)", async () => {
   const seeded = draft([]);
   const candidate: POI = { id: "c1", name: "Vleeshal", location: { lat: 52.38, lon: 4.63 }, facts: [] };
-  const fetchMock = vi.fn((url: string) => {
+  const fetchMock = vi.fn((url: string, _init?: RequestInit) => {
     if (url.startsWith("/api/pois")) return Promise.resolve(new Response(JSON.stringify([candidate]), { status: 200 }));
     if (url === "/api/drafts/d1" ) return Promise.resolve(new Response(JSON.stringify(draft([{ order: 1, poi: candidate }])), { status: 200 }));
     return Promise.resolve(new Response(JSON.stringify(seeded), { status: 201 })); // createDraft
@@ -62,5 +62,6 @@ test("opening the picker and choosing a candidate calls addStop (PUT)", async ()
   await screen.findByText("Vleeshal", {}, { timeout: 2000 });
   const putCall = fetchMock.mock.calls.find((c) => c[0] === "/api/drafts/d1");
   expect(putCall).toBeTruthy();
-  expect(JSON.parse(putCall![1].body).stop_poi_ids).toEqual(["c1"]);
+  const putInit = putCall![1] as RequestInit;
+  expect(JSON.parse(putInit.body as string).stop_poi_ids).toEqual(["c1"]);
 });
