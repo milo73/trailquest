@@ -18,9 +18,10 @@ import threading
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from pathlib import Path
 
 from app.config import settings
-from app.models.schemas import Stop, Theme, Trail
+from app.models.schemas import DraftTrail, Stop, Theme, Trail
 
 # Review status of a cached entry (PRD §8.3: AI + sampling). MVP serves
 # unreviewed content; the curation layer flips entries to approved/rejected.
@@ -239,3 +240,75 @@ class ActiveTrailStore:
 
 
 active_trails = ActiveTrailStore()
+
+
+class DraftStore(ABC):
+    """Registry of creator draft trails."""
+
+    @abstractmethod
+    def put(self, draft: DraftTrail) -> None: ...
+
+    @abstractmethod
+    def get(self, draft_id: str) -> DraftTrail | None: ...
+
+    @abstractmethod
+    def list_drafts(self) -> list[DraftTrail]: ...
+
+    @abstractmethod
+    def clear(self) -> None: ...
+
+
+class InMemoryDraftStore(DraftStore):
+    def __init__(self) -> None:
+        self._drafts: dict[str, DraftTrail] = {}
+
+    def put(self, draft: DraftTrail) -> None:
+        self._drafts[draft.id] = draft
+
+    def get(self, draft_id: str) -> DraftTrail | None:
+        return self._drafts.get(draft_id)
+
+    def list_drafts(self) -> list[DraftTrail]:
+        return list(self._drafts.values())
+
+    def clear(self) -> None:
+        self._drafts.clear()
+
+
+class FileDraftStore(DraftStore):
+    """Persist each draft as ``<id>.json`` under a directory (survives restarts)."""
+
+    def __init__(self, dir_path: str) -> None:
+        self._dir = Path(dir_path)
+        self._dir.mkdir(parents=True, exist_ok=True)
+
+    def _path(self, draft_id: str) -> Path:
+        return self._dir / f"{Path(draft_id).name}.json"  # .name guards path traversal
+
+    def put(self, draft: DraftTrail) -> None:
+        self._path(draft.id).write_text(draft.model_dump_json(indent=2), encoding="utf-8")
+
+    def get(self, draft_id: str) -> DraftTrail | None:
+        path = self._path(draft_id)
+        if not path.exists():
+            return None
+        return DraftTrail.model_validate_json(path.read_text(encoding="utf-8"))
+
+    def list_drafts(self) -> list[DraftTrail]:
+        out: list[DraftTrail] = []
+        for f in sorted(self._dir.glob("*.json")):
+            out.append(DraftTrail.model_validate_json(f.read_text(encoding="utf-8")))
+        return out
+
+    def clear(self) -> None:
+        for f in self._dir.glob("*.json"):
+            f.unlink()
+
+
+def _build_draft_store() -> DraftStore:
+    if settings.draft_store == "file":
+        return FileDraftStore(settings.draft_store_path)
+    return InMemoryDraftStore()
+
+
+drafts: DraftStore = _build_draft_store()
