@@ -1,8 +1,16 @@
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { StudioChrome } from "../StudioChrome";
 import { MOCK_TRAILS, MOCK_DASHBOARD_STATS, type StudioTrailCard } from "../mock/trails";
+import { listDrafts } from "../../api/drafts";
+import { useDraft } from "../draftStore";
+import type { DraftTrail } from "../../api/types";
 
-function statusBadge(status: StudioTrailCard["status"]) {
+function formatKm(km: number): string {
+  return km.toFixed(1).replace(".", ",");
+}
+
+function statusBadge(status: StudioTrailCard["status"] | string) {
   if (status === "concept") {
     return (
       <span
@@ -22,7 +30,7 @@ function statusBadge(status: StudioTrailCard["status"]) {
       </span>
     );
   }
-  if (status === "live") {
+  if (status === "live" || status === "published") {
     return (
       <span
         style={{
@@ -133,8 +141,74 @@ function TrailCard({ trail, onClick }: { trail: StudioTrailCard; onClick: () => 
   );
 }
 
+function DraftCard({ draft, onClick }: { draft: DraftTrail; onClick: () => void }) {
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        background: "#faf6ec",
+        border: "1px solid #e6dcc6",
+        borderRadius: 14,
+        overflow: "hidden",
+        cursor: "pointer",
+      }}
+    >
+      {/* Map thumbnail */}
+      <div style={{ position: "relative", height: 104 }}>
+        <svg viewBox="0 0 380 104" style={{ width: "100%", height: "100%" }}>
+          <rect width="380" height="104" fill="#e8dec9" />
+          <g stroke="#dccfb4" strokeWidth="9">
+            <line x1="-10" y1="50" x2="400" y2="42" />
+            <line x1="160" y1="-10" x2="170" y2="120" />
+          </g>
+          <path d="M50 80 110 30 200 60 300 35" fill="none" stroke="#b5453a" strokeWidth="3" strokeDasharray="2 8" />
+          <circle cx="110" cy="30" r="8" fill="#b5453a" />
+          <circle cx="200" cy="60" r="8" fill="#b5453a" />
+        </svg>
+        {statusBadge(draft.status)}
+      </div>
+
+      {/* Card body */}
+      <div style={{ padding: "15px 16px" }}>
+        <div style={{ font: "400 18px/1.1 var(--tq-serif)", color: "#283a5e" }}>{draft.title}</div>
+        <div style={{ font: "500 11px/1 var(--tq-sans)", color: "#8a7f6d", marginTop: 7 }}>
+          {draft.theme} · {formatKm(draft.actual_distance_km)} km · {draft.stops.length} stops
+        </div>
+        <div
+          style={{
+            display: "flex",
+            gap: 14,
+            marginTop: 14,
+            paddingTop: 13,
+            borderTop: "1px solid #ece2cf",
+            font: "500 11px/1 var(--tq-mono)",
+            color: "#8a7f6d",
+          }}
+        >
+          {draft.status === "concept" && <span>nog niet live</span>}
+          {draft.status === "review" && <span>wacht op moderatie</span>}
+          {draft.status === "published" && <span>gepubliceerd</span>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function Dashboard() {
   const navigate = useNavigate();
+  const { createDraft } = useDraft();
+  const [realDrafts, setRealDrafts] = useState<DraftTrail[]>([]);
+
+  useEffect(() => {
+    listDrafts()
+      .then((drafts) => setRealDrafts(drafts))
+      .catch(() => setRealDrafts([]));
+  }, []);
+
+  async function handleCreate() {
+    await createDraft({ start: { lat: 52.3812, lon: 4.6361 }, distance_km: 5, theme: "mixed" });
+    navigate("/studio/route");
+  }
 
   const playsFormatted = MOCK_DASHBOARD_STATS.plays.toLocaleString("nl-NL");
 
@@ -190,6 +264,16 @@ export function Dashboard() {
 
         {/* Trail card grid */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 18 }}>
+          {/* Real drafts from API — rendered first */}
+          {realDrafts.map((draft) => (
+            <DraftCard
+              key={draft.id}
+              draft={draft}
+              onClick={() => navigate("/studio/route")}
+            />
+          ))}
+
+          {/* Mock cards */}
           {MOCK_TRAILS.map((trail) => (
             <TrailCard
               key={trail.id}
@@ -200,7 +284,7 @@ export function Dashboard() {
 
           {/* "Nieuwe tocht maken" card */}
           <div
-            onClick={() => navigate("/studio/route")}
+            onClick={handleCreate}
             style={{
               border: "1.5px dashed #cbbfa6",
               borderRadius: 14,
