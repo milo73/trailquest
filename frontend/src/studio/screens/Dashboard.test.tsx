@@ -12,9 +12,9 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-test("renders the trail cards and stats", () => {
+test("renders the trail cards and stats", async () => {
   render(<MemoryRouter><DraftProvider><Dashboard /></DraftProvider></MemoryRouter>);
-  expect(screen.getByText("Haarlems Gouden Eeuw")).toBeInTheDocument();
+  expect(await screen.findByText("Haarlems Gouden Eeuw")).toBeInTheDocument();
   expect(screen.getByText("Verborgen hofjes")).toBeInTheDocument();
   expect(screen.getByText("1.240")).toBeInTheDocument(); // keer gespeeld
 });
