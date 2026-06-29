@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Generated content store + trail artifacts (backend runtime)
+*.db
+trails/
+haarlem_trail.json
+*.out
+
+# Subagent-driven-development scratch
+.superpowers/
