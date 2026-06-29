@@ -1,5 +1,5 @@
 from app.cache.store import FileDraftStore, InMemoryDraftStore
-from app.models.schemas import DraftStop, DraftTrail, GeoPoint, POI
+from app.models.schemas import POI, DraftStop, DraftTrail, GeoPoint
 
 
 def _draft(draft_id: str = "d1") -> DraftTrail:
@@ -12,7 +12,12 @@ def _draft(draft_id: str = "d1") -> DraftTrail:
         requested_distance_km=5,
         actual_distance_km=1.2,
         estimated_duration_min=20,
-        stops=[DraftStop(order=1, poi=POI(id="p1", name="Grote Markt", location=GeoPoint(lat=52.38, lon=4.63)))],
+        stops=[
+            DraftStop(
+                order=1,
+                poi=POI(id="p1", name="Grote Markt", location=GeoPoint(lat=52.38, lon=4.63)),
+            )
+        ],
     )
 
 
