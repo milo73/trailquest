@@ -43,3 +43,46 @@ export interface AnswerResult {
   revealed_answer?: string | null;
   feedback: string;
 }
+
+export type DraftStatus = "concept" | "review" | "published";
+
+export interface DraftStop {
+  order: number;
+  poi: POI;
+  story?: string | null;
+  question?: Question | null;
+}
+
+export interface DraftTrail {
+  id: string;
+  title: string;
+  city: string;
+  theme: Theme;
+  start: GeoPoint;
+  requested_distance_km: number;
+  actual_distance_km: number;
+  estimated_duration_min: number;
+  stops: DraftStop[];
+  status: DraftStatus;
+  attributions: string[];
+}
+
+export interface DraftCreate {
+  title?: string;
+  start: GeoPoint;
+  distance_km?: number;
+  theme?: Theme;
+  from_concept?: boolean;
+}
+
+export interface DraftUpdate {
+  title?: string;
+  theme?: Theme;
+  status?: DraftStatus;
+  stop_poi_ids?: string[];
+}
+
+export interface RouteMeasureResult {
+  distance_km: number;
+  duration_min: number;
+}
