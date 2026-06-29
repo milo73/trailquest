@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from fastapi import FastAPI
 
-from app.api import health, trails
+from app.api import health, pois, routes, trails
 from app.config import settings
 
 app = FastAPI(
@@ -20,6 +20,8 @@ app = FastAPI(
 )
 
 app.include_router(health.router)
+app.include_router(pois.router)
+app.include_router(routes.router)
 app.include_router(trails.router)
 
 
