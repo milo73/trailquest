@@ -1,0 +1,64 @@
+import { act, renderHook, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import { DraftProvider, useDraft } from "./draftStore";
+import type { DraftTrail, POI } from "../api/types";
+
+const wrapper = ({ children }: { children: React.ReactNode }) => <DraftProvider>{children}</DraftProvider>;
+
+const poi = (id: string, name: string): POI => ({ id, name, location: { lat: 52.38, lon: 4.63 }, facts: [] });
+
+const draft = (stops: { order: number; poi: POI }[]): DraftTrail => ({
+  id: "d1", title: "Nieuwe tocht", city: "Haarlem", theme: "historical",
+  start: { lat: 52.38, lon: 4.63 }, requested_distance_km: 5, actual_distance_km: 1.2,
+  estimated_duration_min: 20, stops, status: "concept", attributions: [],
+});
+
+beforeEach(() => localStorage.clear());
+afterEach(() => vi.restoreAllMocks());
+
+function mockJson(value: unknown, status = 200) {
+  return new Response(JSON.stringify(value), { status });
+}
+
+test("createDraft sets the draft and persists its id", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(mockJson(draft([]), 201)));
+  const { result } = renderHook(() => useDraft(), { wrapper });
+  await act(async () => {
+    await result.current.createDraft({ start: { lat: 52.38, lon: 4.63 } });
+  });
+  expect(result.current.draft?.id).toBe("d1");
+  expect(localStorage.getItem("tq.studio.draft")).toBe("d1");
+});
+
+test("addStop optimistically appends then replaces with the server copy", async () => {
+  const fetchMock = vi
+    .fn()
+    .mockResolvedValueOnce(mockJson(draft([]), 201)) // createDraft
+    .mockResolvedValueOnce(mockJson(draft([{ order: 1, poi: poi("p1", "Stadhuis") }]))); // updateDraft
+  vi.stubGlobal("fetch", fetchMock);
+
+  const { result } = renderHook(() => useDraft(), { wrapper });
+  await act(async () => {
+    await result.current.createDraft({ start: { lat: 52.38, lon: 4.63 } });
+  });
+  await act(async () => {
+    await result.current.addStop(poi("p1", "Stadhuis"));
+  });
+
+  await waitFor(() => expect(result.current.draft?.stops).toHaveLength(1));
+  expect(result.current.draft?.stops[0].poi.name).toBe("Stadhuis");
+  // the second fetch is the PUT carrying the new stop id
+  const putCall = fetchMock.mock.calls[1];
+  expect(putCall[0]).toBe("/api/drafts/d1");
+  expect(JSON.parse(putCall[1].body).stop_poi_ids).toEqual(["p1"]);
+});
+
+test("setActiveStop records the selected order", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(mockJson(draft([{ order: 1, poi: poi("p1", "X") }]), 201)));
+  const { result } = renderHook(() => useDraft(), { wrapper });
+  await act(async () => {
+    await result.current.createDraft({ start: { lat: 52.38, lon: 4.63 } });
+  });
+  act(() => result.current.setActiveStop(1));
+  expect(result.current.activeStopOrder).toBe(1);
+});
