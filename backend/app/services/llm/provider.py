@@ -42,7 +42,9 @@ _SYSTEM_PROMPT = (
 )
 
 
-def _build_prompt(poi_name: str, theme: Theme, facts: list[Fact], background: str | None) -> str:
+def _build_prompt(
+    poi_name: str, theme: Theme, facts: list[Fact], background: str | None, tone: str | None = None
+) -> str:
     fact_lines = "\n".join(f"- {f.key.replace('_', ' ')}: {f.value}" for f in facts)
     prompt = (
         f"Place: {poi_name}\n"
@@ -53,6 +55,8 @@ def _build_prompt(poi_name: str, theme: Theme, facts: list[Fact], background: st
         prompt += (
             f"\nBackground to paraphrase (do not copy, do not extract new facts):\n{background}\n"
         )
+    if tone:
+        prompt += f"\nTone: write in a {tone} tone.\n"
     return prompt + "\nWrite the stop description now."
 
 
@@ -60,7 +64,13 @@ class LLMProvider(ABC):
     """Abstract base for all LLM providers."""
 
     def rephrase(
-        self, *, poi_name: str, theme: Theme, facts: list[Fact], background: str | None = None
+        self,
+        *,
+        poi_name: str,
+        theme: Theme,
+        facts: list[Fact],
+        background: str | None = None,
+        tone: str | None = None,
     ) -> str:
         """Produce a grounded narrative for a stop using ONLY ``facts``.
 
@@ -69,7 +79,7 @@ class LLMProvider(ABC):
         """
         if not facts and not background:
             return f"{poi_name} is part of your trail."
-        prompt = _build_prompt(poi_name, theme, facts, background)
+        prompt = _build_prompt(poi_name, theme, facts, background, tone)
         return self.complete(system=_SYSTEM_PROMPT, prompt=prompt).strip()
 
     @abstractmethod
@@ -85,7 +95,13 @@ class StubProvider(LLMProvider):
     """
 
     def rephrase(
-        self, *, poi_name: str, theme: Theme, facts: list[Fact], background: str | None = None
+        self,
+        *,
+        poi_name: str,
+        theme: Theme,
+        facts: list[Fact],
+        background: str | None = None,
+        tone: str | None = None,
     ) -> str:
         if not facts:
             return f"{poi_name} is part of your trail."
