@@ -1,85 +1,114 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { StudioChrome } from "../StudioChrome";
 import { MapCanvas } from "../../design-system/primitives/MapCanvas";
 import { Button } from "../../design-system/primitives/Button";
 import { Chip } from "../../design-system/primitives/Chip";
-import { createTrail } from "../../api/trails";
+import { useDraft } from "../draftStore";
+import { PoiPicker } from "../components/PoiPicker";
 
-type RouteStop = {
-  id: string;
-  name: string;
-  isStart?: boolean;
-  warning?: string;
-};
+function formatKm(km: number): string {
+  return km.toFixed(1).replace(".", ",");
+}
 
-export const MOCK_ROUTE_STOPS: RouteStop[] = [
-  { id: "1", name: "Grote Markt", isStart: true },
-  { id: "2", name: "Stadhuis" },
-  { id: "3", name: "Vleeshal" },
-  { id: "4", name: "Sint-Bavokerk" },
-  { id: "5", name: "Hofje van Bakenes" },
-  { id: "6", name: "Molen De Adriaan", warning: "geen feiten" },
-];
+function formatDuration(min: number): string {
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  if (h === 0) return `${m}min`;
+  if (m === 0) return `${h}u`;
+  return `${h}u${m}`;
+}
 
 export function RouteEditor() {
   const navigate = useNavigate();
-  const [stops, setStops] = useState<RouteStop[]>(MOCK_ROUTE_STOPS);
-  const [activeOrder, setActiveOrder] = useState<number | undefined>(undefined);
-  const [generating, setGenerating] = useState(false);
+  const { draft, addStop, removeStop, reorder, setActiveStop, createDraft, loadDraft } = useDraft();
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [creating, setCreating] = useState(false);
 
-  function moveUp(index: number) {
-    if (index <= 0) return;
-    setStops((prev) => {
-      const next = [...prev];
-      [next[index - 1], next[index]] = [next[index], next[index - 1]];
-      return next;
-    });
+  // On mount: if no draft but localStorage has an id, load it
+  useEffect(() => {
+    if (!draft) {
+      const savedId = localStorage.getItem("tq.studio.draft");
+      if (savedId) {
+        loadDraft(savedId);
+      }
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Empty state when no draft and no saved id
+  if (!draft) {
+    return (
+      <StudioChrome breadcrumb="route-editor">
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            height: 760,
+            font: "400 15px/1.5 var(--tq-sans)",
+            color: "#8a7f6d",
+          }}
+        >
+          Nog geen tocht — maak er een via het dashboard of genereer een concept
+        </div>
+      </StudioChrome>
+    );
   }
 
-  function moveDown(index: number) {
-    if (index >= stops.length - 1) return;
-    setStops((prev) => {
-      const next = [...prev];
-      [next[index], next[index + 1]] = [next[index + 1], next[index]];
-      return next;
-    });
-  }
+  const grounded = draft.stops.filter((s) => s.poi.facts.length > 0).length;
+  const warnings = draft.stops.length - grounded;
+  const actual = draft.actual_distance_km;
+  const requested = draft.requested_distance_km;
+  const withinTolerance = Math.abs(actual - requested) <= 0.15 * requested;
 
-  function removeStop(index: number) {
-    setStops((prev) => prev.filter((_, i) => i !== index));
-  }
+  const mapStops = [
+    { order: 0, label: "S" },
+    ...draft.stops.map((s) => ({ order: s.order, label: String(s.order) })),
+  ];
 
-  function addStop() {
-    const id = `new-${Date.now()}`;
-    setStops((prev) => [...prev, { id, name: "Nieuwe stop" }]);
-  }
-
-  async function handleGenereer() {
-    setGenerating(true);
+  async function handleReorder(order: number, dir: "up" | "down") {
+    setBusy(true);
     try {
-      const trail = await createTrail({
-        start: { lat: 52.3812, lon: 4.6361 },
-        distance_km: 5,
-        theme: "historical",
-      });
-      const newStops: RouteStop[] = trail.stops.map((s, i) => ({
-        id: s.poi.id,
-        name: s.poi.name,
-        isStart: i === 0,
-      }));
-      setStops(newStops);
-    } catch {
-      // leave list unchanged on error
+      await reorder(order, dir);
     } finally {
-      setGenerating(false);
+      setBusy(false);
     }
   }
 
-  const mapStops = stops.map((s, i) => ({
-    order: i,
-    label: s.isStart ? "S" : String(i + 1),
-  }));
+  async function handleRemoveStop(order: number) {
+    setBusy(true);
+    try {
+      await removeStop(order);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleAddStop(poi: Parameters<typeof addStop>[0]) {
+    setBusy(true);
+    try {
+      await addStop(poi);
+    } finally {
+      setBusy(false);
+    }
+    setPickerOpen(false);
+  }
+
+  async function handleGenereer() {
+    if (creating) return;
+    setCreating(true);
+    try {
+      await createDraft({
+        start: draft?.start ?? { lat: 52.3812, lon: 4.6361 },
+        distance_km: 5,
+        theme: "historical",
+        from_concept: true,
+      });
+    } finally {
+      setCreating(false);
+    }
+  }
 
   return (
     <StudioChrome
@@ -104,9 +133,9 @@ export function RouteEditor() {
             variant="primary"
             style={{ height: 40, fontSize: 13, borderRadius: 10 }}
             onClick={handleGenereer}
-            disabled={generating}
+            disabled={creating}
           >
-            {generating ? "Genereren…" : "Genereer concept"}
+            {creating ? "Genereren…" : "Genereer concept"}
           </Button>
         </div>
       }
@@ -126,7 +155,7 @@ export function RouteEditor() {
           {/* Header */}
           <div style={{ padding: "20px 20px 16px", borderBottom: "1px solid #e6dcc6" }}>
             <div style={{ font: "400 24px/1.1 var(--tq-serif)", color: "#283a5e" }}>
-              Haarlems Gouden Eeuw
+              {draft.title}
             </div>
             <div
               style={{
@@ -153,16 +182,16 @@ export function RouteEditor() {
             <div style={{ display: "flex", gap: 18, marginTop: 16 }}>
               <div>
                 <div style={{ font: "400 19px/1 var(--tq-serif)", color: "#211f1b" }}>
-                  5,2<span style={{ font: "600 11px var(--tq-sans)", color: "#8a7f6d" }}> km</span>
+                  {formatKm(draft.actual_distance_km)}<span style={{ font: "600 11px var(--tq-sans)", color: "#8a7f6d" }}> km</span>
                 </div>
                 <div style={{ font: "500 10px/1 var(--tq-mono)", color: "#8a7f6d", marginTop: 4 }}>AFSTAND</div>
               </div>
               <div>
-                <div style={{ font: "400 19px/1 var(--tq-serif)", color: "#211f1b" }}>~1u50</div>
+                <div style={{ font: "400 19px/1 var(--tq-serif)", color: "#211f1b" }}>~{formatDuration(draft.estimated_duration_min)}</div>
                 <div style={{ font: "500 10px/1 var(--tq-mono)", color: "#8a7f6d", marginTop: 4 }}>DUUR</div>
               </div>
               <div>
-                <div style={{ font: "400 19px/1 var(--tq-serif)", color: "#211f1b" }}>{stops.length}</div>
+                <div style={{ font: "400 19px/1 var(--tq-serif)", color: "#211f1b" }}>{draft.stops.length}</div>
                 <div style={{ font: "500 10px/1 var(--tq-mono)", color: "#8a7f6d", marginTop: 4 }}>STOPS</div>
               </div>
             </div>
@@ -197,149 +226,200 @@ export function RouteEditor() {
             }}
           >
             <ul role="list" aria-label="Stops" style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 5 }}>
-              {stops.map((stop, index) => (
-                <li
-                  key={stop.id}
-                  onClick={() => {
-                    setActiveOrder(index);
-                    navigate("/studio/stop");
-                  }}
+              {/* Start row — non-removable */}
+              <li
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  padding: "9px 10px",
+                  borderRadius: 9,
+                  cursor: "default",
+                }}
+              >
+                {/* Drag handle icon */}
+                <svg width="12" height="16" viewBox="0 0 12 16" fill="#cbbfa6">
+                  <circle cx="3" cy="3" r="1.4" />
+                  <circle cx="9" cy="3" r="1.4" />
+                  <circle cx="3" cy="8" r="1.4" />
+                  <circle cx="9" cy="8" r="1.4" />
+                  <circle cx="3" cy="13" r="1.4" />
+                  <circle cx="9" cy="13" r="1.4" />
+                </svg>
+                {/* Order badge */}
+                <span
                   style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    padding: "9px 10px",
-                    borderRadius: 9,
-                    cursor: "pointer",
-                    background: stop.warning ? "#fbeee6" : undefined,
-                    border: stop.warning ? "1.5px solid #b5453a" : undefined,
+                    width: 24,
+                    height: 24,
+                    borderRadius: "50%",
+                    background: "#283a5e",
+                    border: "none",
+                    color: "#fff",
+                    font: "700 11px/24px var(--tq-sans)",
+                    textAlign: "center",
+                    flexShrink: 0,
+                    display: "inline-block",
                   }}
                 >
-                  {/* Drag handle icon */}
-                  <svg width="12" height="16" viewBox="0 0 12 16" fill={stop.warning ? "#d99" : "#cbbfa6"}>
-                    <circle cx="3" cy="3" r="1.4" />
-                    <circle cx="9" cy="3" r="1.4" />
-                    <circle cx="3" cy="8" r="1.4" />
-                    <circle cx="9" cy="8" r="1.4" />
-                    <circle cx="3" cy="13" r="1.4" />
-                    <circle cx="9" cy="13" r="1.4" />
-                  </svg>
+                  S
+                </span>
+                {/* Name */}
+                <span
+                  style={{
+                    flex: 1,
+                    font: "600 13px/1.2 var(--tq-sans)",
+                    color: "#211f1b",
+                  }}
+                >
+                  Startpunt<span style={{ fontWeight: 500, color: "#8a7f6d" }}> · start</span>
+                </span>
+                {/* Checkmark */}
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#6f8a4f" strokeWidth="2.4" style={{ flexShrink: 0 }}>
+                  <path d="M5 12l4 4 10-10" />
+                </svg>
+              </li>
 
-                  {/* Order badge */}
-                  <span
+              {/* Regular stop rows */}
+              {draft.stops.map((stop, index) => {
+                const hasWarning = stop.poi.facts.length === 0;
+                return (
+                  <li
+                    key={stop.poi.id}
+                    onClick={() => {
+                      setActiveStop(stop.order);
+                      navigate("/studio/stop");
+                    }}
                     style={{
-                      width: 24,
-                      height: 24,
-                      borderRadius: "50%",
-                      background: stop.isStart ? "#283a5e" : stop.warning ? "#b5453a" : "#fff",
-                      border: stop.isStart || stop.warning ? "none" : "2px solid #b5453a",
-                      color: stop.isStart || stop.warning ? "#fff" : "#283a5e",
-                      font: "700 11px/24px var(--tq-sans)",
-                      textAlign: "center",
-                      flexShrink: 0,
-                      display: "inline-block",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      padding: "9px 10px",
+                      borderRadius: 9,
+                      cursor: "pointer",
+                      background: hasWarning ? "#fbeee6" : undefined,
+                      border: hasWarning ? "1.5px solid #b5453a" : undefined,
                     }}
                   >
-                    {stop.isStart ? "S" : index + 1}
-                  </span>
+                    {/* Drag handle icon */}
+                    <svg width="12" height="16" viewBox="0 0 12 16" fill={hasWarning ? "#d99" : "#cbbfa6"}>
+                      <circle cx="3" cy="3" r="1.4" />
+                      <circle cx="9" cy="3" r="1.4" />
+                      <circle cx="3" cy="8" r="1.4" />
+                      <circle cx="9" cy="8" r="1.4" />
+                      <circle cx="3" cy="13" r="1.4" />
+                      <circle cx="9" cy="13" r="1.4" />
+                    </svg>
 
-                  {/* Name */}
-                  <span
-                    style={{
-                      flex: 1,
-                      font: stop.warning ? "700 13px/1.2 var(--tq-sans)" : "600 13px/1.2 var(--tq-sans)",
-                      color: stop.warning ? "#963a30" : stop.isStart ? "#211f1b" : "#211f1b",
-                    }}
-                  >
-                    {stop.name}
-                    {stop.isStart && (
-                      <span style={{ fontWeight: 500, color: "#8a7f6d" }}> · start</span>
-                    )}
-                  </span>
-
-                  {/* Warning badge */}
-                  {stop.warning && (
+                    {/* Order badge */}
                     <span
                       style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 4,
-                        font: "600 10px/1 var(--tq-sans)",
-                        color: "#a3781f",
+                        width: 24,
+                        height: 24,
+                        borderRadius: "50%",
+                        background: hasWarning ? "#b5453a" : "#fff",
+                        border: hasWarning ? "none" : "2px solid #b5453a",
+                        color: hasWarning ? "#fff" : "#283a5e",
+                        font: "700 11px/24px var(--tq-sans)",
+                        textAlign: "center",
                         flexShrink: 0,
+                        display: "inline-block",
                       }}
                     >
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#c5912f" strokeWidth="2">
-                        <path d="M12 3 22 20H2Z" />
-                        <line x1="12" y1="10" x2="12" y2="14.5" />
-                      </svg>
-                      {stop.warning}
+                      {stop.order}
                     </span>
-                  )}
 
-                  {/* Checkmark (non-warning stops) */}
-                  {!stop.warning && (
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#6f8a4f" strokeWidth="2.4" style={{ flexShrink: 0 }}>
-                      <path d="M5 12l4 4 10-10" />
-                    </svg>
-                  )}
+                    {/* Name */}
+                    <span
+                      style={{
+                        flex: 1,
+                        font: hasWarning ? "700 13px/1.2 var(--tq-sans)" : "600 13px/1.2 var(--tq-sans)",
+                        color: hasWarning ? "#963a30" : "#211f1b",
+                      }}
+                    >
+                      {stop.poi.name}
+                    </span>
 
-                  {/* Reorder + remove controls (non-start rows) */}
-                  {!stop.isStart && (
+                    {/* Warning badge */}
+                    {hasWarning && (
+                      <span
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 4,
+                          font: "600 10px/1 var(--tq-sans)",
+                          color: "#a3781f",
+                          flexShrink: 0,
+                        }}
+                      >
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#c5912f" strokeWidth="2">
+                          <path d="M12 3 22 20H2Z" />
+                          <line x1="12" y1="10" x2="12" y2="14.5" />
+                        </svg>
+                        geen feiten
+                      </span>
+                    )}
+
+                    {/* Checkmark (non-warning stops) */}
+                    {!hasWarning && (
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#6f8a4f" strokeWidth="2.4" style={{ flexShrink: 0 }}>
+                        <path d="M5 12l4 4 10-10" />
+                      </svg>
+                    )}
+
+                    {/* Reorder + remove controls */}
                     <span
                       style={{ display: "flex", flexDirection: "column", gap: 2, flexShrink: 0 }}
                       onClick={(e) => e.stopPropagation()}
                     >
                       <button
-                        aria-label={`${stop.name} omhoog`}
-                        onClick={(e) => { e.stopPropagation(); moveUp(index); }}
-                        disabled={index === 0}
+                        aria-label={`${stop.poi.name} omhoog`}
+                        onClick={(e) => { e.stopPropagation(); handleReorder(stop.order, "up"); }}
+                        disabled={busy || index === 0}
                         style={{
                           width: 18,
                           height: 18,
                           border: "none",
                           background: "transparent",
-                          cursor: index === 0 ? "default" : "pointer",
+                          cursor: (busy || index === 0) ? "default" : "pointer",
                           padding: 0,
                           fontSize: 10,
                           lineHeight: 1,
-                          color: index === 0 ? "#cbbfa6" : "#8a7f6d",
+                          color: (busy || index === 0) ? "#cbbfa6" : "#8a7f6d",
                         }}
                       >
                         ▲
                       </button>
                       <button
-                        aria-label={`${stop.name} omlaag`}
-                        onClick={(e) => { e.stopPropagation(); moveDown(index); }}
-                        disabled={index === stops.length - 1}
+                        aria-label={`${stop.poi.name} omlaag`}
+                        onClick={(e) => { e.stopPropagation(); handleReorder(stop.order, "down"); }}
+                        disabled={busy || index === draft.stops.length - 1}
                         style={{
                           width: 18,
                           height: 18,
                           border: "none",
                           background: "transparent",
-                          cursor: index === stops.length - 1 ? "default" : "pointer",
+                          cursor: (busy || index === draft.stops.length - 1) ? "default" : "pointer",
                           padding: 0,
                           fontSize: 10,
                           lineHeight: 1,
-                          color: index === stops.length - 1 ? "#cbbfa6" : "#8a7f6d",
+                          color: (busy || index === draft.stops.length - 1) ? "#cbbfa6" : "#8a7f6d",
                         }}
                       >
                         ▼
                       </button>
                     </span>
-                  )}
 
-                  {/* Remove button (non-start rows) */}
-                  {!stop.isStart && (
+                    {/* Remove button */}
                     <button
-                      aria-label={`${stop.name} verwijderen`}
-                      onClick={(e) => { e.stopPropagation(); removeStop(index); }}
+                      aria-label={`${stop.poi.name} verwijderen`}
+                      onClick={(e) => { e.stopPropagation(); handleRemoveStop(stop.order); }}
+                      disabled={busy}
                       style={{
                         width: 18,
                         height: 18,
                         border: "none",
                         background: "transparent",
-                        cursor: "pointer",
+                        cursor: busy ? "default" : "pointer",
                         padding: 0,
                         fontSize: 13,
                         lineHeight: 1,
@@ -349,16 +429,17 @@ export function RouteEditor() {
                     >
                       ×
                     </button>
-                  )}
-                </li>
-              ))}
+                  </li>
+                );
+              })}
             </ul>
           </div>
 
           {/* Add stop */}
           <div style={{ padding: "12px 18px 18px" }}>
             <button
-              onClick={addStop}
+              onClick={() => setPickerOpen(true)}
+              disabled={busy}
               style={{
                 width: "100%",
                 height: 42,
@@ -366,8 +447,8 @@ export function RouteEditor() {
                 border: "1.5px dashed #cbbfa6",
                 background: "transparent",
                 font: "600 13px/1 var(--tq-sans)",
-                color: "#8a7f6d",
-                cursor: "pointer",
+                color: busy ? "#cbbfa6" : "#8a7f6d",
+                cursor: busy ? "default" : "pointer",
               }}
             >
               + Stop toevoegen
@@ -377,7 +458,7 @@ export function RouteEditor() {
 
         {/* Center map area */}
         <div style={{ flex: 1, position: "relative", background: "#ece4d3", overflow: "hidden" }}>
-          <MapCanvas stops={mapStops} activeOrder={activeOrder} />
+          <MapCanvas stops={mapStops} />
 
           {/* Toolbar */}
           <div
@@ -464,15 +545,19 @@ export function RouteEditor() {
               <circle cx="12" cy="12" r="9" />
               <path d="M8 12l3 3 5-6" />
             </svg>
-            <span style={{ font: "600 12px/1 var(--tq-sans)", color: "#283a5e" }}>Validatie: 3 ok</span>
-            <span style={{ color: "#cbbfa6" }}>·</span>
-            <Chip tone="gold">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#c5912f" strokeWidth="2.2">
-                <path d="M12 3 22 20H2Z" />
-                <line x1="12" y1="10" x2="12" y2="14.5" />
-              </svg>
-              1 waarschuwing
-            </Chip>
+            <span style={{ font: "600 12px/1 var(--tq-sans)", color: "#283a5e" }}>Validatie: {grounded} ok</span>
+            {warnings > 0 && (
+              <>
+                <span style={{ color: "#cbbfa6" }}>·</span>
+                <Chip tone="gold">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#c5912f" strokeWidth="2.2">
+                    <path d="M12 3 22 20H2Z" />
+                    <line x1="12" y1="10" x2="12" y2="14.5" />
+                  </svg>
+                  {warnings} waarschuwing
+                </Chip>
+              </>
+            )}
           </div>
 
           {/* Distance meter (bottom left) */}
@@ -490,7 +575,7 @@ export function RouteEditor() {
             }}
           >
             <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-              <span style={{ font: "400 30px/1 var(--tq-serif)", color: "#283a5e" }}>5,2 km</span>
+              <span style={{ font: "400 30px/1 var(--tq-serif)", color: "#283a5e" }}>{formatKm(draft.actual_distance_km)} km</span>
               <span style={{ font: "500 11px/1 var(--tq-mono)", color: "#8a7f6d" }}>looproute</span>
             </div>
             <div
@@ -533,12 +618,24 @@ export function RouteEditor() {
                 color: "#8a7f6d",
               }}
             >
-              <span>doel 5 km</span>
-              <span style={{ color: "#6f8a4f", fontWeight: 600 }}>binnen tolerantie ±15%</span>
+              <span>doel {formatKm(draft.requested_distance_km)} km</span>
+              <span style={{ color: withinTolerance ? "#6f8a4f" : "#c5912f", fontWeight: 600 }}>
+                {withinTolerance ? "binnen tolerantie ±15%" : "buiten tolerantie"}
+              </span>
             </div>
           </div>
         </div>
       </div>
+
+      {/* PoiPicker modal */}
+      {pickerOpen && (
+        <PoiPicker
+          start={draft.start}
+          excludeIds={draft.stops.map((s) => s.poi.id)}
+          onPick={handleAddStop}
+          onClose={() => setPickerOpen(false)}
+        />
+      )}
     </StudioChrome>
   );
 }

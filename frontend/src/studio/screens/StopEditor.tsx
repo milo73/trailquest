@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { QuestionType } from "../../api/types";
 import { StudioChrome } from "../StudioChrome";
 import { SourceBadge } from "../../design-system/primitives/SourceBadge";
@@ -6,6 +6,7 @@ import { Button } from "../../design-system/primitives/Button";
 import { PhoneFrame } from "../../design-system/primitives/PhoneFrame";
 import { MapCanvas } from "../../design-system/primitives/MapCanvas";
 import { MOCK_STOP } from "../mock/stop";
+import { useDraft } from "../draftStore";
 
 /** Pure helper: only Type A and D can gate the next stop. */
 export function canGate(type: QuestionType): boolean {
@@ -30,11 +31,19 @@ function countWords(text: string): number {
 
 export function StopEditor() {
   const stop = MOCK_STOP;
+  const { draft, activeStopOrder } = useDraft();
+  const activePoi = draft?.stops.find((s) => s.order === activeStopOrder)?.poi ?? MOCK_STOP.poi;
 
-  // Feiten: track which facts are included (all on by default)
+  // Feiten: track which facts are included (all on by default).
+  // Seed from activePoi so switching to a real POI with different fact keys
+  // starts with all checkboxes checked rather than all unchecked.
   const [includedFacts, setIncludedFacts] = useState<Record<string, boolean>>(
-    Object.fromEntries(stop.poi.facts.map((f) => [f.key, true]))
+    Object.fromEntries(activePoi.facts.map((f) => [f.key, true]))
   );
+
+  useEffect(() => {
+    setIncludedFacts(Object.fromEntries(activePoi.facts.map((f) => [f.key, true])));
+  }, [activePoi.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Verhaal state
   const [story, setStory] = useState(stop.story);
@@ -128,7 +137,7 @@ export function StopEditor() {
 
           {/* POI info */}
           <div>
-            <div style={{ font: "400 22px/1.1 var(--tq-serif)", color: "#283a5e" }}>{stop.poi.name}</div>
+            <div style={{ font: "400 22px/1.1 var(--tq-serif)", color: "#283a5e" }}>{activePoi.name}</div>
             <div style={{ font: "500 12px/1.4 var(--tq-sans)", color: "#8a7f6d", marginTop: 7 }}>
               Grote Markt 22, Haarlem
             </div>
@@ -152,7 +161,7 @@ export function StopEditor() {
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#6f8a4f" strokeWidth="2.4">
                 <path d="M5 12l4 4 10-10" />
               </svg>
-              Feiten gegrond ({stop.poi.facts.length} bronnen)
+              Feiten gegrond ({activePoi.facts.length} bronnen)
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8, font: "600 12px/1 var(--tq-sans)", color: "#6f8a4f" }}>
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#6f8a4f" strokeWidth="2.4">
@@ -206,9 +215,11 @@ export function StopEditor() {
               </span>
             </div>
             <div style={{ padding: "8px 17px 14px" }}>
-              {stop.poi.facts.map((fact, i) => {
-                const isLast = i === stop.poi.facts.length - 1;
-                const included = includedFacts[fact.key];
+              {activePoi.facts.map((fact, i) => {
+                const isLast = i === activePoi.facts.length - 1;
+                // Default to true for any fact key not yet in the map (e.g. during
+                // the brief window before the useEffect re-seeds from the new POI).
+                const included = includedFacts[fact.key] ?? true;
                 return (
                   <div
                     key={fact.key}
@@ -571,7 +582,7 @@ export function StopEditor() {
                     marginTop: 5,
                   }}
                 >
-                  {stop.poi.name}
+                  {activePoi.name}
                 </div>
               </div>
               <p

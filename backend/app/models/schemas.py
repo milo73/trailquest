@@ -179,3 +179,65 @@ class AnswerResult(BaseModel):
     unlocked_next: bool  # whether the next stop is now unlocked
     revealed_answer: str | None = None  # set once attempts are exhausted or honor-system reveal
     feedback: str
+
+
+class DraftStatus(StrEnum):
+    """Lifecycle of a creator's draft trail (pre-publication)."""
+
+    CONCEPT = "concept"
+    REVIEW = "review"
+    PUBLISHED = "published"
+
+
+class DraftStop(BaseModel):
+    """A stop on a draft trail. Unlike a player-facing ``Stop``, the generated
+    ``story``/``question`` are optional — they are authored later in the studio."""
+
+    order: int
+    poi: POI
+    story: str | None = None
+    question: Question | None = None
+
+
+class DraftTrail(BaseModel):
+    """A creator's work-in-progress trail. The player never sees this; only a
+    published ``Trail`` (with fully-grounded ``Stop``s) is playable."""
+
+    id: str
+    title: str
+    city: str
+    theme: Theme
+    start: GeoPoint
+    requested_distance_km: float
+    actual_distance_km: float
+    estimated_duration_min: int
+    stops: list[DraftStop] = Field(default_factory=list)
+    status: DraftStatus = DraftStatus.CONCEPT
+    attributions: list[str] = Field(default_factory=list)
+
+
+class DraftCreate(BaseModel):
+    title: str | None = None
+    start: GeoPoint
+    distance_km: float = Field(default=5, ge=1, le=25)
+    theme: Theme = Theme.MIXED
+    from_concept: bool = False
+
+
+class DraftUpdate(BaseModel):
+    title: str | None = None
+    theme: Theme | None = None
+    status: DraftStatus | None = None
+    # Full ordered list of POI ids the draft should now contain (add/remove/reorder
+    # in one idempotent update). None means "leave stops unchanged".
+    stop_poi_ids: list[str] | None = None
+
+
+class RouteMeasureRequest(BaseModel):
+    start: GeoPoint
+    points: list[GeoPoint] = Field(default_factory=list)
+
+
+class RouteMeasureResult(BaseModel):
+    distance_km: float
+    duration_min: int

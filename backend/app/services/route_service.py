@@ -54,6 +54,24 @@ def _loop_distance_km(start: GeoPoint, ordered: list[POI]) -> float:
     return sum(_haversine_km(points[i], points[i + 1]) for i in range(len(points) - 1))
 
 
+def measure_loop(start: GeoPoint, ordered_points: list[GeoPoint]) -> tuple[float, int]:
+    """Measure a loop (start → points → start) in the given order.
+
+    The creator controls stop order, so this does NOT reorder. Distance is the
+    haversine loop estimate; duration adds walking time plus per-stop time.
+    Returns ``(distance_km, duration_min)``.
+    """
+    if not ordered_points:
+        return 0.0, 0
+    points = [start, *ordered_points, start]
+    distance = round(
+        sum(_haversine_km(points[i], points[i + 1]) for i in range(len(points) - 1)), 2
+    )
+    walk_min = (distance / settings.walking_speed_kmh) * 60
+    duration = round(walk_min + len(ordered_points) * settings.minutes_per_stop)
+    return distance, duration
+
+
 def _order_and_measure(start: GeoPoint, selected: list[POI]) -> tuple[list[POI], float]:
     """Order stops into a loop and return (ordered_pois, loop_distance_km).
 
