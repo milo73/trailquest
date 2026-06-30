@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { getPois } from "../../api/pois";
-import { ApiError } from "../../api/client";
 import type { GeoPoint, POI } from "../../api/types";
 
 interface Props {
@@ -13,17 +12,19 @@ interface Props {
 export function PoiPicker({ start, excludeIds, onPick, onClose }: Props) {
   const [candidates, setCandidates] = useState<POI[]>([]);
   const [empty, setEmpty] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
+    setLoading(true);
     getPois({ lat: start.lat, lon: start.lon, distance_km: 5 })
       .then((pois) => {
         const filtered = pois.filter((p) => !excludeIds.includes(p.id));
         setCandidates(filtered);
         if (filtered.length === 0) setEmpty(true);
       })
-      .catch((err) => {
-        if (err instanceof ApiError || err instanceof Error) setEmpty(true);
-      });
+      .catch(() => setError(true))
+      .finally(() => setLoading(false));
   }, [start.lat, start.lon]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
@@ -91,7 +92,29 @@ export function PoiPicker({ start, excludeIds, onPick, onClose }: Props) {
 
         {/* POI list */}
         <div style={{ flex: 1, overflowY: "auto", padding: "10px 12px" }}>
-          {empty ? (
+          {loading ? (
+            <p
+              style={{
+                textAlign: "center",
+                font: "400 13px/1.5 var(--tq-sans)",
+                color: "var(--tq-muted)",
+                padding: "24px 0",
+              }}
+            >
+              POI&apos;s laden…
+            </p>
+          ) : error ? (
+            <p
+              style={{
+                textAlign: "center",
+                font: "400 13px/1.5 var(--tq-sans)",
+                color: "var(--tq-muted)",
+                padding: "24px 0",
+              }}
+            >
+              Kon POI&apos;s niet laden
+            </p>
+          ) : empty ? (
             <p
               style={{
                 textAlign: "center",

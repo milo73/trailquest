@@ -6,6 +6,7 @@ import { Button } from "../../design-system/primitives/Button";
 import { Chip } from "../../design-system/primitives/Chip";
 import { useDraft } from "../draftStore";
 import { PoiPicker } from "../components/PoiPicker";
+import { CustomStopForm } from "../components/CustomStopForm";
 
 function formatKm(km: number): string {
   return km.toFixed(1).replace(".", ",");
@@ -21,10 +22,16 @@ function formatDuration(min: number): string {
 
 export function RouteEditor() {
   const navigate = useNavigate();
-  const { draft, addStop, removeStop, reorder, setActiveStop, createDraft, loadDraft } = useDraft();
-  const [pickerOpen, setPickerOpen] = useState(false);
+  const { draft, addStop, removeStop, reorder, setActiveStop, createDraft, loadDraft, addCustomStop, renameDraft, saving } = useDraft();
+  const [addMode, setAddMode] = useState<null | "menu" | "catalog" | "custom">(null);
   const [busy, setBusy] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [title, setTitle] = useState("");
+
+  // Seed title from draft, re-seed when draft id changes
+  useEffect(() => {
+    if (draft) setTitle(draft.title);
+  }, [draft?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // On mount: if no draft but localStorage has an id, load it
   useEffect(() => {
@@ -92,7 +99,17 @@ export function RouteEditor() {
     } finally {
       setBusy(false);
     }
-    setPickerOpen(false);
+    setAddMode(null);
+  }
+
+  async function handleAddCustomStop(body: Parameters<typeof addCustomStop>[0]) {
+    setBusy(true);
+    try {
+      await addCustomStop(body);
+    } finally {
+      setBusy(false);
+    }
+    setAddMode(null);
   }
 
   async function handleGenereer() {
@@ -154,8 +171,34 @@ export function RouteEditor() {
         >
           {/* Header */}
           <div style={{ padding: "20px 20px 16px", borderBottom: "1px solid #e6dcc6" }}>
-            <div style={{ font: "400 24px/1.1 var(--tq-serif)", color: "#283a5e" }}>
-              {draft.title}
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <input
+                aria-label="Tochtnaam"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                onBlur={() => {
+                  if (title.trim() && title !== draft.title) renameDraft(title.trim());
+                }}
+                style={{
+                  flex: 1,
+                  font: "400 24px/1.1 var(--tq-serif)",
+                  color: "#283a5e",
+                  border: "none",
+                  background: "transparent",
+                  outline: "none",
+                  padding: 0,
+                  minWidth: 0,
+                }}
+              />
+              <span
+                style={{
+                  font: "500 10px/1 var(--tq-mono)",
+                  color: "#8a7f6d",
+                  flexShrink: 0,
+                }}
+              >
+                {saving ? "Bezig…" : "Opgeslagen ✓"}
+              </span>
             </div>
             <div
               style={{
@@ -436,9 +479,9 @@ export function RouteEditor() {
           </div>
 
           {/* Add stop */}
-          <div style={{ padding: "12px 18px 18px" }}>
+          <div style={{ padding: "12px 18px 18px", position: "relative" }}>
             <button
-              onClick={() => setPickerOpen(true)}
+              onClick={() => setAddMode("menu")}
               disabled={busy}
               style={{
                 width: "100%",
@@ -453,6 +496,57 @@ export function RouteEditor() {
             >
               + Stop toevoegen
             </button>
+            {/* Add-mode chooser menu */}
+            {addMode === "menu" && (
+              <div
+                style={{
+                  position: "absolute",
+                  bottom: "calc(100% - 12px)",
+                  left: 18,
+                  right: 18,
+                  background: "#faf6ec",
+                  border: "1px solid #e0d5bf",
+                  borderRadius: 10,
+                  boxShadow: "0 8px 20px -12px rgba(33,31,27,.4)",
+                  overflow: "hidden",
+                  zIndex: 10,
+                }}
+              >
+                <button
+                  onClick={() => setAddMode("catalog")}
+                  style={{
+                    display: "block",
+                    width: "100%",
+                    padding: "12px 16px",
+                    border: "none",
+                    borderBottom: "1px solid #e6dcc6",
+                    background: "transparent",
+                    font: "600 13px/1 var(--tq-sans)",
+                    color: "#283a5e",
+                    cursor: "pointer",
+                    textAlign: "left",
+                  }}
+                >
+                  Kies uit de buurt
+                </button>
+                <button
+                  onClick={() => setAddMode("custom")}
+                  style={{
+                    display: "block",
+                    width: "100%",
+                    padding: "12px 16px",
+                    border: "none",
+                    background: "transparent",
+                    font: "600 13px/1 var(--tq-sans)",
+                    color: "#283a5e",
+                    cursor: "pointer",
+                    textAlign: "left",
+                  }}
+                >
+                  Maak een nieuwe stop
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -628,12 +722,21 @@ export function RouteEditor() {
       </div>
 
       {/* PoiPicker modal */}
-      {pickerOpen && (
+      {addMode === "catalog" && (
         <PoiPicker
           start={draft.start}
           excludeIds={draft.stops.map((s) => s.poi.id)}
           onPick={handleAddStop}
-          onClose={() => setPickerOpen(false)}
+          onClose={() => setAddMode(null)}
+        />
+      )}
+
+      {/* CustomStopForm modal */}
+      {addMode === "custom" && (
+        <CustomStopForm
+          start={draft.start}
+          onSubmit={(body) => { handleAddCustomStop(body); }}
+          onClose={() => setAddMode(null)}
         />
       )}
     </StudioChrome>

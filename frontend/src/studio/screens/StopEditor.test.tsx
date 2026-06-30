@@ -215,6 +215,53 @@ test("Regenereer generates from selected facts and fills the fields", async () =
   expect(JSON.parse((genCall![1] as RequestInit).body as string).fact_keys).toEqual(["build_year"]);
 });
 
+test("prev/next pagination changes the active stop", async () => {
+  const draftWithStops = {
+    id: "d1", title: "t", city: "Haarlem", theme: "historical",
+    start: { lat: 52.38, lon: 4.63 }, requested_distance_km: 5, actual_distance_km: 1,
+    estimated_duration_min: 10,
+    stops: [
+      { order: 1, poi: { id: "p1", name: "Eerste", location: { lat: 52.38, lon: 4.63 }, facts: [] }, story: "", question: null },
+      { order: 2, poi: { id: "p2", name: "Tweede", location: { lat: 52.38, lon: 4.63 }, facts: [] }, story: "", question: null },
+    ],
+    status: "concept", attributions: [],
+  };
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(draftWithStops), { status: 201 })));
+  function Seed() {
+    const { setActiveStop, createDraft } = useDraft();
+    return <button onClick={async () => { await createDraft({ start: { lat: 52.38, lon: 4.63 } }); setActiveStop(1); }}>seed</button>;
+  }
+  render(<MemoryRouter><DraftProvider><Seed /><StopEditor /></DraftProvider></MemoryRouter>);
+  await userEvent.click(screen.getByText("seed"));
+  expect(await screen.findAllByText("Eerste")).not.toHaveLength(0);
+  await userEvent.click(screen.getByLabelText("Volgende stop"));
+  expect(await screen.findAllByText("Tweede")).not.toHaveLength(0);
+});
+
+test("a failed Regenereer shows an error message", async () => {
+  const draftWithStop = {
+    id: "d1", title: "t", city: "Haarlem", theme: "historical",
+    start: { lat: 52.38, lon: 4.63 }, requested_distance_km: 5, actual_distance_km: 1,
+    estimated_duration_min: 10,
+    stops: [{ order: 1, poi: { id: "p1", name: "Waag", location: { lat: 52.38, lon: 4.63 }, facts: [] }, story: "", question: null }],
+    status: "concept", attributions: [],
+  };
+  const fetchMock = vi.fn((url: string) =>
+    String(url).endsWith("/generate")
+      ? Promise.resolve(new Response("boom", { status: 500 }))
+      : Promise.resolve(new Response(JSON.stringify(draftWithStop), { status: 201 })),
+  );
+  vi.stubGlobal("fetch", fetchMock);
+  function Seed() {
+    const { setActiveStop, createDraft } = useDraft();
+    return <button onClick={async () => { await createDraft({ start: { lat: 52.38, lon: 4.63 } }); setActiveStop(1); }}>seed</button>;
+  }
+  render(<MemoryRouter><DraftProvider><Seed /><StopEditor /></DraftProvider></MemoryRouter>);
+  await userEvent.click(screen.getByText("seed"));
+  await userEvent.click(await screen.findByRole("button", { name: /Regenereer|Genereren/i }));
+  expect(await screen.findByText(/Genereren mislukt/i)).toBeInTheDocument();
+});
+
 test("switching type A→C immediately saves with the NEW type, not the old one", async () => {
   // Start with a Type-A question (answer present so it's valid) and a fact so the
   // POI renders correctly. Switch to Type C via the select and assert the PUT body

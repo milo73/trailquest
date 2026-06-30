@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from "vitest";
-import { createDraft, updateDraft, updateStopContent, generateStopContent } from "./drafts";
+import { createDraft, updateDraft, updateStopContent, generateStopContent, createCustomStop } from "./drafts";
 import { getPois } from "./pois";
 
 afterEach(() => vi.restoreAllMocks());
@@ -54,4 +54,14 @@ test("generateStopContent POSTs fact_keys + tone", async () => {
   const [url, init] = fetchMock.mock.calls[0];
   expect(url).toBe("/api/drafts/d1/stops/1/generate");
   expect(JSON.parse(init.body)).toEqual({ fact_keys: ["height_m"], tone: "speels" });
+});
+
+test("createCustomStop POSTs name + coords to the draft stops path", async () => {
+  const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ id: "d1" }), { status: 201 }));
+  vi.stubGlobal("fetch", fetchMock);
+  await createCustomStop("d1", { name: "Mijn plek", lat: 52.39, lon: 4.64 });
+  const [url, init] = fetchMock.mock.calls[0];
+  expect(url).toBe("/api/drafts/d1/stops");
+  expect(init.method).toBe("POST");
+  expect(JSON.parse(init.body)).toEqual({ name: "Mijn plek", lat: 52.39, lon: 4.64 });
 });

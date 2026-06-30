@@ -158,11 +158,32 @@ The creator studio now manages real draft trails backed by the FastAPI backend:
 - **Live distance meter** — after every stop addition, removal, or reorder the editor calls `POST /routes/measure` and updates the km / min display. Distance is a walking-network estimate (haversine if OSRM is not configured).
 - **Degraded offline state** — without the backend running, the studio dashboard and route editor show empty or error states for drafts (they degrade gracefully, they do not crash). The Stop editor and Validation screens remain fully functional on local state.
 
+### Studio editor improvements
+
+The route and stop editors have been extended with the following capabilities:
+
+- **Inline rename** — the draft title in the Route editor is an editable field; changes autosave on blur via `PUT /drafts/{id}` (no separate save button required).
+- **Clickable logo** — the TrailQuest logo in the studio shell is a link back to `/studio` (the dashboard).
+- **Add-stop chooser** — clicking "+ Stop toevoegen" opens a two-tab chooser: a catalog picker that loads real Haarlem POIs from `GET /pois` (with loading and error states), and a custom-stop form (fields: name, optional lat/lon) that calls `POST /drafts/{id}/stops`.
+- **Stop editor — prev/next pagination** — arrow buttons in the Stop editor navigate between stops in the current draft without returning to the Route editor.
+- **Stop editor — "Terug naar route"** — a back link navigates to `/studio/route` with the current draft loaded.
+- **Stop editor — Regenereer error feedback** — if `POST /drafts/{id}/stops/{order}/generate` fails, an inline error message is shown rather than silently failing.
+- **Active stop survives reload** — the active stop's order is persisted to `localStorage` under the key `tq.studio.activeStop`; when `/studio/stop` is loaded the store restores it and re-fetches the draft so the editor resumes the correct stop after a hard reload.
+
+**Manual smoke** (requires `npm run dev` + backend running):
+
+- Open `http://localhost:5173/studio` → open a draft → rename the title in-place and click outside → the name updates (autosaved).
+- Click "+ Stop toevoegen" → select a POI from the catalog picker → confirm it appears in the stop list.
+- Open the chooser again → switch to the custom-stop tab → enter a name and optional coordinates → add the stop → confirm it appears in the list.
+- Click a stop row → Stop editor opens; use the prev/next arrows to page through stops.
+- Click "Terug naar route" → the Route editor reloads with the correct draft.
+- Navigate directly to `http://localhost:5173/studio/stop` (hard reload) → confirm the editor restores the previously active stop.
+
 ---
 
 ## Automated smoke results
 
-Run against commit on branch `feat/studio-route-creation`.
+Run against commit on branch `feat/studio-editor-fixes`.
 
 ### Typecheck (`npm run typecheck`)
 
@@ -174,13 +195,13 @@ exit 0
 ### Tests (`npm test`)
 
 ```
-Test Files  20 passed (20)
-      Tests  38 passed (38)
-   Duration  ~1.2s
+Test Files  21 passed (21)
+      Tests  59 passed (59)
+   Duration  ~1.3s
 ```
 
 Test files:
-- `src/api/drafts.test.ts` (3)
+- `src/api/drafts.test.ts` (6)
 - `src/api/trails.test.ts` (2)
 - `src/quester/gamification.test.ts` (5)
 - `src/quester/store.test.tsx` (3)
@@ -193,25 +214,26 @@ Test files:
 - `src/design-system/primitives/MapCanvas.test.tsx` (1)
 - `src/design-system/primitives/SegmentedControl.test.tsx` (1)
 - `src/design-system/primitives/SourceBadge.test.tsx` (2)
-- `src/studio/components/PoiPicker.test.tsx` (1)
-- `src/studio/draftStore.test.tsx` (3)
-- `src/studio/screens/Dashboard.test.tsx` (2)
-- `src/studio/screens/RouteEditor.test.tsx` (2)
-- `src/studio/screens/StopEditor.test.tsx` (4)
+- `src/studio/components/PoiPicker.test.tsx` (3)
+- `src/studio/draftStore.test.tsx` (8)
+- `src/studio/screens/Dashboard.test.tsx` (3)
+- `src/studio/screens/RouteEditor.test.tsx` (4)
+- `src/studio/screens/StopEditor.test.tsx` (11)
 - `src/studio/screens/Validation.test.tsx` (1)
+- `src/studio/StudioChrome.test.tsx` (1)
 - `src/App.test.tsx` (1)
 
-Note: React Router v6 emits two "Future Flag Warning" lines during studio and player tests (`v7_startTransition`, `v7_relativeSplatPath`). These are informational deprecation hints from the library, not test failures.
+Note: React Router v6 emits two "Future Flag Warning" lines during studio and player tests (`v7_startTransition`, `v7_relativeSplatPath`). These are informational deprecation hints from the library, not test failures. Some tests also emit unhandled rejection noise ("Body has already been read") from mock Responses reused across fetch calls — this is pre-existing and does not indicate test failures.
 
 ### Build (`npm run build`)
 
 ```
 vite v5.4.21 building for production...
-68 modules transformed.
+69 modules transformed.
 dist/index.html                   0.40 kB │ gzip:  0.27 kB
 dist/assets/index-DSq2xkZK.css    1.31 kB │ gzip:  0.64 kB
-dist/assets/index-Cx8AmG5x.js   245.90 kB │ gzip: 71.26 kB
-built in 305ms
+dist/assets/index-ByF_a8Kc.js   255.95 kB │ gzip: 73.44 kB
+built in 308ms
 exit 0
 ```
 

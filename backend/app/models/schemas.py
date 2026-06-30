@@ -256,3 +256,9 @@ class StopGenerateRequest(BaseModel):
 class StopGenerateResult(BaseModel):
     story: str
     question: Question
+
+
+class CustomStopRequest(BaseModel):
+    name: str
+    lat: float | None = None
+    lon: float | None = None

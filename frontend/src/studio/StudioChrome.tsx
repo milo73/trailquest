@@ -66,7 +66,20 @@ export function StudioChrome({ breadcrumb = "mijn-tochten", actions, children }:
           gap: 18,
         }}
       >
-        <span style={{ font: "400 22px/1 var(--tq-serif)", color: "#b5453a" }}>TrailQuest</span>
+        <button
+          onClick={() => navigate("/studio")}
+          aria-label="TrailQuest — naar mijn tochten"
+          style={{
+            font: "400 22px/1 var(--tq-serif)",
+            color: "#b5453a",
+            background: "transparent",
+            border: "none",
+            padding: 0,
+            cursor: "pointer",
+          }}
+        >
+          TrailQuest
+        </button>
         <span
           style={{
             font: "600 10px/1 var(--tq-mono)",
