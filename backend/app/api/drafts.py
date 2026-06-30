@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException
 
 from app.models.schemas import (
+    CustomStopRequest,
     DraftCreate,
     DraftTrail,
     DraftUpdate,
@@ -38,6 +39,14 @@ def get_draft(draft_id: str) -> DraftTrail:
 @router.put("/{draft_id}", response_model=DraftTrail)
 def update_draft(draft_id: str, req: DraftUpdate) -> DraftTrail:
     draft = draft_service.update(draft_id, req)
+    if draft is None:
+        raise HTTPException(status_code=404, detail="Draft not found")
+    return draft
+
+
+@router.post("/{draft_id}/stops", response_model=DraftTrail, status_code=201)
+def create_custom_stop(draft_id: str, req: CustomStopRequest) -> DraftTrail:
+    draft = draft_service.add_custom_stop(draft_id, name=req.name, lat=req.lat, lon=req.lon)
     if draft is None:
         raise HTTPException(status_code=404, detail="Draft not found")
     return draft

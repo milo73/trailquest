@@ -12,10 +12,12 @@ import uuid
 from app.cache.store import drafts
 from app.config import settings
 from app.models.schemas import (
+    POI,
     DraftCreate,
     DraftStop,
     DraftTrail,
     DraftUpdate,
+    GeoPoint,
     Question,
     Source,
     TrailRequest,
@@ -139,3 +141,24 @@ def generate_stop_content(
         selected = [f for f in stop.poi.facts if f.key in set(fact_keys)]
         poi = stop.poi.model_copy(update={"facts": selected})
     return content_service.author_content(poi, draft.theme, tone)
+
+
+def add_custom_stop(
+    draft_id: str, *, name: str, lat: float | None = None, lon: float | None = None
+) -> DraftTrail | None:
+    draft = drafts.get(draft_id)
+    if draft is None:
+        return None
+    poi = POI(
+        id=f"custom:{uuid.uuid4()}",
+        name=name,
+        location=GeoPoint(
+            lat=lat if lat is not None else draft.start.lat,
+            lon=lon if lon is not None else draft.start.lon,
+        ),
+        facts=[],
+    )
+    draft.stops.append(DraftStop(order=len(draft.stops) + 1, poi=poi))
+    _measure(draft)
+    drafts.put(draft)
+    return draft
