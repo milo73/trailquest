@@ -8,7 +8,8 @@ POI/data, content, and gamification modules behind a single API. Run locally wit
 
 from __future__ import annotations
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 
 from app.api import drafts, health, pois, routes, trails
 from app.config import settings
@@ -24,6 +25,11 @@ app.include_router(health.router)
 app.include_router(pois.router)
 app.include_router(routes.router)
 app.include_router(trails.router)
+
+
+@app.exception_handler(ValueError)
+async def value_error_handler(request: Request, exc: ValueError) -> JSONResponse:
+    return JSONResponse(status_code=422, content={"detail": str(exc)})
 
 
 @app.get("/")

@@ -86,3 +86,18 @@ export interface RouteMeasureResult {
   distance_km: number;
   duration_min: number;
 }
+
+export interface StopContentUpdate {
+  story?: string | null;
+  question?: Question | null;
+}
+
+export interface StopGenerateRequest {
+  fact_keys?: string[];
+  tone?: string;
+}
+
+export interface StopGenerateResult {
+  story: string;
+  question: Question;
+}

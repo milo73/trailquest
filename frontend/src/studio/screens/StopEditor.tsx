@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { QuestionType } from "../../api/types";
+import type { Question, QuestionType } from "../../api/types";
 import { StudioChrome } from "../StudioChrome";
 import { SourceBadge } from "../../design-system/primitives/SourceBadge";
 import { Button } from "../../design-system/primitives/Button";
@@ -29,10 +29,24 @@ function countWords(text: string): number {
   return text.trim() === "" ? 0 : text.trim().split(/\s+/).length;
 }
 
+const TONES = [
+  { value: "speels", label: "Speels" },
+  { value: "zakelijk", label: "Zakelijk" },
+  { value: "kindvriendelijk", label: "Kindvriendelijk" },
+  { value: "verhalend", label: "Verhalend" },
+];
+
 export function StopEditor() {
+  const { draft, activeStopOrder, saveStopContent, generateStopContent } = useDraft();
+  const activeStop = draft?.stops.find((s) => s.order === activeStopOrder);
+  const activePoi = activeStop?.poi ?? MOCK_STOP.poi;
+  const sourceStory = activeStop ? (activeStop.story ?? "") : MOCK_STOP.story;
+  const sourceQuestion = activeStop
+    ? (activeStop.question ?? { type: "A" as QuestionType, prompt: "", answer: "", hint: "", gates: true })
+    : MOCK_STOP.question;
+
+  // Use MOCK_STOP for the stop order display when no active stop
   const stop = MOCK_STOP;
-  const { draft, activeStopOrder } = useDraft();
-  const activePoi = draft?.stops.find((s) => s.order === activeStopOrder)?.poi ?? MOCK_STOP.poi;
 
   // Feiten: track which facts are included (all on by default).
   // Seed from activePoi so switching to a real POI with different fact keys
@@ -46,11 +60,76 @@ export function StopEditor() {
   }, [activePoi.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Verhaal state
-  const [story, setStory] = useState(stop.story);
+  const [story, setStory] = useState(sourceStory);
 
   // Opdracht state
-  const [questionType, setQuestionType] = useState<QuestionType>(stop.question.type as QuestionType);
-  const [gatesNext, setGatesNext] = useState<boolean>(stop.question.gates && canGate(stop.question.type as QuestionType));
+  const [prompt, setPrompt] = useState(sourceQuestion.prompt);
+  const [answer, setAnswer] = useState(sourceQuestion.answer ?? "");
+  const [hint, setHint] = useState(sourceQuestion.hint ?? "");
+  const [questionType, setQuestionType] = useState<QuestionType>(sourceQuestion.type as QuestionType);
+  const [gatesNext, setGatesNext] = useState<boolean>(Boolean(sourceQuestion.gates) && canGate(sourceQuestion.type as QuestionType));
+  const [answerError, setAnswerError] = useState(false);
+  const [tone, setTone] = useState("speels");
+  const [regenerating, setRegenerating] = useState(false);
+
+  useEffect(() => {
+    setStory(sourceStory);
+    setPrompt(sourceQuestion.prompt);
+    setAnswer(sourceQuestion.answer ?? "");
+    setHint(sourceQuestion.hint ?? "");
+    setQuestionType(sourceQuestion.type as QuestionType);
+    setGatesNext(Boolean(sourceQuestion.gates) && canGate(sourceQuestion.type as QuestionType));
+  }, [activeStop?.order, activePoi.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function handleRegenerate() {
+    if (activeStopOrder === undefined) return;
+    const factKeys = activePoi.facts.filter((f) => includedFacts[f.key] ?? true).map((f) => f.key);
+    setRegenerating(true);
+    try {
+      const result = await generateStopContent(activeStopOrder, { fact_keys: factKeys, tone });
+      setStory(result.story);
+      setPrompt(result.question.prompt);
+      setAnswer(result.question.answer ?? "");
+      setHint(result.question.hint ?? "");
+      setQuestionType(result.question.type as QuestionType);
+      setGatesNext(Boolean(result.question.gates) && canGate(result.question.type as QuestionType));
+      await saveStopContent(activeStopOrder, { story: result.story, question: result.question });
+    } finally {
+      setRegenerating(false);
+    }
+  }
+
+  function buildQuestionWith(type: QuestionType, gates: boolean): Question | null {
+    const gating = canGate(type);
+    if (gating && answer.trim() === "") {
+      setAnswerError(true);
+      return null;
+    }
+    setAnswerError(false);
+    return {
+      type,
+      prompt,
+      answer: gating ? answer : null,
+      hint: hint || null,
+      gates: gating && gates,
+    };
+  }
+
+  async function saveQuestionWith(type: QuestionType, gates: boolean) {
+    if (activeStopOrder === undefined) return;
+    const q = buildQuestionWith(type, gates);
+    if (q === null) return;
+    await saveStopContent(activeStopOrder, { question: q });
+  }
+
+  async function saveQuestion() {
+    return saveQuestionWith(questionType, gatesNext);
+  }
+
+  async function saveStory() {
+    if (activeStopOrder === undefined) return;
+    await saveStopContent(activeStopOrder, { story });
+  }
 
   function handleTypeChange(newType: QuestionType) {
     setQuestionType(newType);
@@ -167,7 +246,7 @@ export function StopEditor() {
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#6f8a4f" strokeWidth="2.4">
                 <path d="M5 12l4 4 10-10" />
               </svg>
-              Opdracht kan gaten (Type A)
+              Opdracht {canGate(questionType) ? "kan gaten" : "gaten uit"} (Type {questionType})
             </div>
           </div>
         </div>
@@ -323,12 +402,31 @@ export function StopEditor() {
               >
                 AI-gegenereerd
               </span>
-              <div style={{ marginLeft: "auto", display: "flex", gap: 7 }}>
+              <div style={{ marginLeft: "auto", display: "flex", gap: 7, alignItems: "center" }}>
+                <select
+                  aria-label="Toon"
+                  value={tone}
+                  onChange={(e) => setTone(e.target.value)}
+                  style={{
+                    font: "500 11px/1 var(--tq-sans)",
+                    color: "#36322b",
+                    border: "1px solid #e6dcc6",
+                    borderRadius: 7,
+                    padding: "6px 8px",
+                    background: "#fdfbf6",
+                    cursor: "pointer",
+                  }}
+                >
+                  {TONES.map((t) => (
+                    <option key={t.value} value={t.value}>
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
                 <Button
                   variant="secondary"
-                  onClick={() => {
-                    /* no-op stub */
-                  }}
+                  onClick={handleRegenerate}
+                  disabled={regenerating}
                   style={{
                     height: "auto",
                     padding: "6px 10px",
@@ -340,7 +438,7 @@ export function StopEditor() {
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#b5453a" strokeWidth="2">
                     <path d="M21 12a9 9 0 1 1-3-6.7M21 4v5h-5" />
                   </svg>
-                  Regenereer
+                  {regenerating ? "Genereren…" : "Regenereer"}
                 </Button>
               </div>
             </div>
@@ -349,6 +447,7 @@ export function StopEditor() {
                 aria-label="Verhaal"
                 value={story}
                 onChange={(e) => setStory(e.target.value)}
+                onBlur={saveStory}
                 rows={5}
                 style={{
                   width: "100%",
@@ -421,17 +520,32 @@ export function StopEditor() {
             <div style={{ padding: "15px 18px", display: "flex", gap: 18, alignItems: "flex-start" }}>
               {/* Left: question text + answer */}
               <div style={{ flex: 1 }}>
-                <p style={{ font: "500 15px/1.5 var(--tq-sans)", color: "#36322b", margin: "0 0 13px" }}>
-                  "{stop.question.prompt}"
-                </p>
-                {stop.question.answer && (
-                  <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+                <input
+                  aria-label="Vraagprompt"
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  onBlur={saveQuestion}
+                  style={{
+                    width: "100%",
+                    font: "500 15px/1.5 var(--tq-sans)",
+                    color: "#36322b",
+                    border: "1px solid #e6dcc6",
+                    borderRadius: 8,
+                    padding: "8px 10px",
+                    background: "#fdfbf6",
+                    boxSizing: "border-box",
+                    marginBottom: 13,
+                  }}
+                />
+                {canGate(questionType) && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 10 }}>
                     <span style={{ font: "600 11px/1 var(--tq-mono)", color: "#8a7f6d" }}>ANTWOORD</span>
-                    <span
+                    <input
+                      aria-label="Antwoord"
+                      value={answer}
+                      onChange={(e) => setAnswer(e.target.value)}
+                      onBlur={saveQuestion}
                       style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 7,
                         font: "700 14px/1 var(--tq-sans)",
                         color: "#211f1b",
                         background: "#f1f3f8",
@@ -439,18 +553,35 @@ export function StopEditor() {
                         borderRadius: 8,
                         padding: "8px 12px",
                       }}
-                    >
-                      {stop.question.answer}
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#7d8aa6" strokeWidth="2.2">
-                        <rect x="5" y="11" width="14" height="9" rx="2" />
-                        <path d="M8 11V8a4 4 0 0 1 8 0v3" />
-                      </svg>
-                    </span>
+                    />
                     <span style={{ font: "500 11px/1.3 var(--tq-sans)", color: "#8a7f6d" }}>
                       afgeleid uit de data — daarom controleerbaar
                     </span>
                   </div>
                 )}
+                {answerError && (
+                  <div style={{ font: "500 11px/1.3 var(--tq-sans)", color: "#b5453a", marginBottom: 8 }}>
+                    Antwoord verplicht voor een poortvraag
+                  </div>
+                )}
+                <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+                  <span style={{ font: "600 11px/1 var(--tq-mono)", color: "#8a7f6d" }}>HINT</span>
+                  <input
+                    aria-label="Hint"
+                    value={hint}
+                    onChange={(e) => setHint(e.target.value)}
+                    onBlur={saveQuestion}
+                    style={{
+                      flex: 1,
+                      font: "500 13px/1 var(--tq-sans)",
+                      color: "#36322b",
+                      background: "#fdfbf6",
+                      border: "1px solid #e6dcc6",
+                      borderRadius: 8,
+                      padding: "7px 10px",
+                    }}
+                  />
+                </div>
               </div>
 
               {/* Right: type panel + gate toggle */}
@@ -480,7 +611,11 @@ export function StopEditor() {
                   id="vraagtype-select"
                   aria-label="Vraagtype"
                   value={questionType}
-                  onChange={(e) => handleTypeChange(e.target.value as QuestionType)}
+                  onChange={(e) => {
+                    const newType = e.target.value as QuestionType;
+                    handleTypeChange(newType);
+                    void saveQuestionWith(newType, canGate(newType) ? gatesNext : false);
+                  }}
                   style={{
                     width: "100%",
                     font: "600 12px/1 var(--tq-sans)",
@@ -521,7 +656,11 @@ export function StopEditor() {
                     checked={gatesNext}
                     disabled={gateDisabled}
                     onChange={(e) => {
-                      if (!gateDisabled) setGatesNext(e.target.checked);
+                      if (!gateDisabled) {
+                        const checked = e.target.checked;
+                        setGatesNext(checked);
+                        void saveQuestionWith(questionType, checked);
+                      }
                     }}
                     style={{ width: 30, height: 18, cursor: gateDisabled ? "not-allowed" : "pointer" }}
                   />
@@ -619,9 +758,9 @@ export function StopEditor() {
                     margin: "0 0 10px",
                   }}
                 >
-                  {stop.question.prompt.length > 80
-                    ? stop.question.prompt.slice(0, 77) + "…"
-                    : stop.question.prompt}
+                  {prompt.length > 80
+                    ? prompt.slice(0, 77) + "…"
+                    : prompt}
                 </p>
                 <div style={{ display: "flex", gap: 7 }}>
                   <span

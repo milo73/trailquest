@@ -62,3 +62,30 @@ test("setActiveStop records the selected order", async () => {
   act(() => result.current.setActiveStop(1));
   expect(result.current.activeStopOrder).toBe(1);
 });
+
+test("saveStopContent PUTs and replaces the draft with the server copy", async () => {
+  const fetchMock = vi
+    .fn()
+    .mockResolvedValueOnce(mockJson(draft([{ order: 1, poi: poi("p1", "X") }]), 201)) // createDraft
+    .mockResolvedValueOnce(mockJson({ ...draft([{ order: 1, poi: poi("p1", "X") }]), stops: [{ order: 1, poi: poi("p1", "X"), story: "Saved." }] })); // PUT
+  vi.stubGlobal("fetch", fetchMock);
+  const { result } = renderHook(() => useDraft(), { wrapper });
+  await act(async () => { await result.current.createDraft({ start: { lat: 52.38, lon: 4.63 } }); });
+  await act(async () => { await result.current.saveStopContent(1, { story: "Saved." }); });
+  expect(result.current.draft?.stops[0].story).toBe("Saved.");
+  const putCall = fetchMock.mock.calls[1];
+  expect(putCall[0]).toBe("/api/drafts/d1/stops/1");
+});
+
+test("generateStopContent returns generated content without changing the draft", async () => {
+  const fetchMock = vi
+    .fn()
+    .mockResolvedValueOnce(mockJson(draft([{ order: 1, poi: poi("p1", "X") }]), 201)) // createDraft
+    .mockResolvedValueOnce(mockJson({ story: "Gen.", question: { type: "C", prompt: "?", gates: false } })); // generate
+  vi.stubGlobal("fetch", fetchMock);
+  const { result } = renderHook(() => useDraft(), { wrapper });
+  await act(async () => { await result.current.createDraft({ start: { lat: 52.38, lon: 4.63 } }); });
+  let gen: { story: string } | undefined;
+  await act(async () => { gen = await result.current.generateStopContent(1, { tone: "speels" }); });
+  expect(gen?.story).toBe("Gen.");
+});

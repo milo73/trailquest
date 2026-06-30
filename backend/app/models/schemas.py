@@ -241,3 +241,18 @@ class RouteMeasureRequest(BaseModel):
 class RouteMeasureResult(BaseModel):
     distance_km: float
     duration_min: int
+
+
+class StopContentUpdate(BaseModel):
+    story: str | None = None
+    question: Question | None = None
+
+
+class StopGenerateRequest(BaseModel):
+    fact_keys: list[str] | None = None
+    tone: str | None = None
+
+
+class StopGenerateResult(BaseModel):
+    story: str
+    question: Question

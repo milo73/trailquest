@@ -9,9 +9,7 @@ def test_empty_points_is_zero():
 def test_loop_distance_and_duration_increase_with_points():
     start = GeoPoint(lat=52.380, lon=4.630)
     one = measure_loop(start, [GeoPoint(lat=52.385, lon=4.640)])
-    two = measure_loop(
-        start, [GeoPoint(lat=52.385, lon=4.640), GeoPoint(lat=52.390, lon=4.650)]
-    )
+    two = measure_loop(start, [GeoPoint(lat=52.385, lon=4.640), GeoPoint(lat=52.390, lon=4.650)])
     assert one[0] > 0
     assert two[0] > one[0]  # more stops, longer loop
     assert two[1] > one[1]  # and longer duration
