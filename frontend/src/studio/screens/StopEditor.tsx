@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { QuestionType } from "../../api/types";
 import { StudioChrome } from "../StudioChrome";
 import { SourceBadge } from "../../design-system/primitives/SourceBadge";
@@ -34,10 +34,16 @@ export function StopEditor() {
   const { draft, activeStopOrder } = useDraft();
   const activePoi = draft?.stops.find((s) => s.order === activeStopOrder)?.poi ?? MOCK_STOP.poi;
 
-  // Feiten: track which facts are included (all on by default)
+  // Feiten: track which facts are included (all on by default).
+  // Seed from activePoi so switching to a real POI with different fact keys
+  // starts with all checkboxes checked rather than all unchecked.
   const [includedFacts, setIncludedFacts] = useState<Record<string, boolean>>(
-    Object.fromEntries(stop.poi.facts.map((f) => [f.key, true]))
+    Object.fromEntries(activePoi.facts.map((f) => [f.key, true]))
   );
+
+  useEffect(() => {
+    setIncludedFacts(Object.fromEntries(activePoi.facts.map((f) => [f.key, true])));
+  }, [activePoi.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Verhaal state
   const [story, setStory] = useState(stop.story);
@@ -211,7 +217,9 @@ export function StopEditor() {
             <div style={{ padding: "8px 17px 14px" }}>
               {activePoi.facts.map((fact, i) => {
                 const isLast = i === activePoi.facts.length - 1;
-                const included = includedFacts[fact.key];
+                // Default to true for any fact key not yet in the map (e.g. during
+                // the brief window before the useEffect re-seeds from the new POI).
+                const included = includedFacts[fact.key] ?? true;
                 return (
                   <div
                     key={fact.key}

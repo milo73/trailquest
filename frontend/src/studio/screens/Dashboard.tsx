@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { StudioChrome } from "../StudioChrome";
 import { MOCK_TRAILS, MOCK_DASHBOARD_STATS, type StudioTrailCard } from "../mock/trails";
@@ -196,8 +196,9 @@ function DraftCard({ draft, onClick }: { draft: DraftTrail; onClick: () => void 
 
 export function Dashboard() {
   const navigate = useNavigate();
-  const { createDraft } = useDraft();
+  const { createDraft, loadDraft } = useDraft();
   const [realDrafts, setRealDrafts] = useState<DraftTrail[]>([]);
+  const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     listDrafts()
@@ -205,9 +206,26 @@ export function Dashboard() {
       .catch(() => setRealDrafts([]));
   }, []);
 
+  const openDraft = useCallback(async (id: string) => {
+    try {
+      await loadDraft(id);
+      navigate("/studio/route");
+    } catch {
+      // failed load — stay on dashboard, don't navigate
+    }
+  }, [loadDraft, navigate]);
+
   async function handleCreate() {
-    await createDraft({ start: { lat: 52.3812, lon: 4.6361 }, distance_km: 5, theme: "mixed" });
-    navigate("/studio/route");
+    if (creating) return;
+    setCreating(true);
+    try {
+      await createDraft({ start: { lat: 52.3812, lon: 4.6361 }, distance_km: 5, theme: "mixed" });
+      navigate("/studio/route");
+    } catch {
+      // ignore failed create
+    } finally {
+      setCreating(false);
+    }
   }
 
   const playsFormatted = MOCK_DASHBOARD_STATS.plays.toLocaleString("nl-NL");
@@ -269,7 +287,7 @@ export function Dashboard() {
             <DraftCard
               key={draft.id}
               draft={draft}
-              onClick={() => navigate("/studio/route")}
+              onClick={() => openDraft(draft.id)}
             />
           ))}
 
@@ -284,7 +302,9 @@ export function Dashboard() {
 
           {/* "Nieuwe tocht maken" card */}
           <div
-            onClick={handleCreate}
+            onClick={creating ? undefined : handleCreate}
+            role="button"
+            aria-disabled={creating}
             style={{
               border: "1.5px dashed #cbbfa6",
               borderRadius: 14,
@@ -295,7 +315,8 @@ export function Dashboard() {
               gap: 11,
               color: "#8a7f6d",
               minHeight: 200,
-              cursor: "pointer",
+              cursor: creating ? "default" : "pointer",
+              opacity: creating ? 0.6 : 1,
             }}
           >
             <span

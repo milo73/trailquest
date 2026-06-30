@@ -24,6 +24,7 @@ export function RouteEditor() {
   const { draft, addStop, removeStop, reorder, setActiveStop, createDraft, loadDraft } = useDraft();
   const [pickerOpen, setPickerOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [creating, setCreating] = useState(false);
 
   // On mount: if no draft but localStorage has an id, load it
   useEffect(() => {
@@ -95,12 +96,18 @@ export function RouteEditor() {
   }
 
   async function handleGenereer() {
-    await createDraft({
-      start: draft?.start ?? { lat: 52.3812, lon: 4.6361 },
-      distance_km: 5,
-      theme: "historical",
-      from_concept: true,
-    });
+    if (creating) return;
+    setCreating(true);
+    try {
+      await createDraft({
+        start: draft?.start ?? { lat: 52.3812, lon: 4.6361 },
+        distance_km: 5,
+        theme: "historical",
+        from_concept: true,
+      });
+    } finally {
+      setCreating(false);
+    }
   }
 
   return (
@@ -126,8 +133,9 @@ export function RouteEditor() {
             variant="primary"
             style={{ height: 40, fontSize: 13, borderRadius: 10 }}
             onClick={handleGenereer}
+            disabled={creating}
           >
-            Genereer concept
+            {creating ? "Genereren…" : "Genereer concept"}
           </Button>
         </div>
       }
