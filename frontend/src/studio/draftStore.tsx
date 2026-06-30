@@ -1,12 +1,14 @@
 import { createContext, useContext, useMemo, useState } from "react";
-import { createDraft as apiCreate, getDraft, updateDraft, updateStopContent, generateStopContent as apiGenerateStopContent } from "../api/drafts";
-import type { DraftCreate, DraftStop, DraftTrail, POI, StopContentUpdate, StopGenerateRequest, StopGenerateResult } from "../api/types";
+import { createDraft as apiCreate, createCustomStop, getDraft, updateDraft, updateStopContent, generateStopContent as apiGenerateStopContent } from "../api/drafts";
+import type { CustomStopRequest, DraftCreate, DraftStop, DraftTrail, POI, StopContentUpdate, StopGenerateRequest, StopGenerateResult } from "../api/types";
 
 const STORAGE_KEY = "tq.studio.draft";
+const ACTIVE_KEY = "tq.studio.activeStop";
 
 interface DraftApi {
   draft?: DraftTrail;
   activeStopOrder?: number;
+  saving: boolean;
   createDraft: (req: DraftCreate) => Promise<DraftTrail>;
   loadDraft: (id: string) => Promise<void>;
   addStop: (poi: POI) => Promise<void>;
@@ -15,6 +17,8 @@ interface DraftApi {
   setActiveStop: (order: number) => void;
   saveStopContent: (order: number, content: StopContentUpdate) => Promise<void>;
   generateStopContent: (order: number, body: StopGenerateRequest) => Promise<StopGenerateResult>;
+  renameDraft: (title: string) => Promise<void>;
+  addCustomStop: (body: CustomStopRequest) => Promise<void>;
 }
 
 const Ctx = createContext<DraftApi | null>(null);
@@ -25,19 +29,29 @@ function renumber(stops: DraftStop[]): DraftStop[] {
 
 export function DraftProvider({ children }: { children: React.ReactNode }) {
   const [draft, setDraft] = useState<DraftTrail | undefined>(undefined);
-  const [activeStopOrder, setActiveStopOrder] = useState<number | undefined>(undefined);
+  const [activeStopOrder, setActiveStopOrder] = useState<number | undefined>(() => {
+    const v = localStorage.getItem(ACTIVE_KEY);
+    return v != null ? Number(v) : undefined;
+  });
+  const [saving, setSaving] = useState(false);
 
   const api = useMemo<DraftApi>(() => {
     // Persist the new stop order to the server; replace local draft with the
     // authoritative copy (recomputed distance/duration/attributions).
     async function save(next: DraftTrail) {
       setDraft(next); // optimistic
-      const saved = await updateDraft(next.id, { stop_poi_ids: next.stops.map((s) => s.poi.id) });
-      setDraft(saved);
+      setSaving(true);
+      try {
+        const saved = await updateDraft(next.id, { stop_poi_ids: next.stops.map((s) => s.poi.id) });
+        setDraft(saved);
+      } finally {
+        setSaving(false);
+      }
     }
     return {
       draft,
       activeStopOrder,
+      saving,
       createDraft: async (req) => {
         const created = await apiCreate(req);
         setDraft(created);
@@ -68,18 +82,46 @@ export function DraftProvider({ children }: { children: React.ReactNode }) {
         [swapped[i], swapped[j]] = [swapped[j], swapped[i]];
         await save({ ...draft, stops: renumber(swapped) });
       },
-      setActiveStop: (order) => setActiveStopOrder(order),
+      setActiveStop: (order) => {
+        setActiveStopOrder(order);
+        localStorage.setItem(ACTIVE_KEY, String(order));
+      },
       saveStopContent: async (order, content) => {
         if (!draft) return;
-        const saved = await updateStopContent(draft.id, order, content);
-        setDraft(saved);
+        setSaving(true);
+        try {
+          const saved = await updateStopContent(draft.id, order, content);
+          setDraft(saved);
+        } finally {
+          setSaving(false);
+        }
       },
       generateStopContent: async (order, body) => {
         if (!draft) throw new Error("generateStopContent: no active draft");
         return apiGenerateStopContent(draft.id, order, body);
       },
+      renameDraft: async (title) => {
+        if (!draft) return;
+        setSaving(true);
+        try {
+          const saved = await updateDraft(draft.id, { title });
+          setDraft(saved);
+        } finally {
+          setSaving(false);
+        }
+      },
+      addCustomStop: async (body) => {
+        if (!draft) return;
+        setSaving(true);
+        try {
+          const saved = await createCustomStop(draft.id, body);
+          setDraft(saved);
+        } finally {
+          setSaving(false);
+        }
+      },
     };
-  }, [draft, activeStopOrder]);
+  }, [draft, activeStopOrder, saving]);
 
   return <Ctx.Provider value={api}>{children}</Ctx.Provider>;
 }

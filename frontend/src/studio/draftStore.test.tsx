@@ -89,3 +89,43 @@ test("generateStopContent returns generated content without changing the draft",
   await act(async () => { gen = await result.current.generateStopContent(1, { tone: "speels" }); });
   expect(gen?.story).toBe("Gen.");
 });
+
+test("setActiveStop persists, and a fresh provider restores activeStopOrder", () => {
+  localStorage.clear();
+  const first = renderHook(() => useDraft(), { wrapper });
+  act(() => first.result.current.setActiveStop(3));
+  expect(localStorage.getItem("tq.studio.activeStop")).toBe("3");
+  const second = renderHook(() => useDraft(), { wrapper });
+  expect(second.result.current.activeStopOrder).toBe(3);
+});
+
+test("renameDraft PUTs the title and replaces the draft; saving toggles", async () => {
+  const renamed = { ...draft([]), title: "Hernoemd" };
+  const fetchMock = vi
+    .fn()
+    .mockResolvedValueOnce(mockJson(draft([]), 201)) // createDraft
+    .mockResolvedValueOnce(mockJson(renamed)); // updateDraft(title)
+  vi.stubGlobal("fetch", fetchMock);
+  const { result } = renderHook(() => useDraft(), { wrapper });
+  await act(async () => { await result.current.createDraft({ start: { lat: 52.38, lon: 4.63 } }); });
+  await act(async () => { await result.current.renameDraft("Hernoemd"); });
+  expect(result.current.draft?.title).toBe("Hernoemd");
+  expect(result.current.saving).toBe(false);
+  const putCall = fetchMock.mock.calls[1];
+  expect(putCall[0]).toBe("/api/drafts/d1");
+  expect(JSON.parse(putCall[1].body)).toEqual({ title: "Hernoemd" });
+});
+
+test("addCustomStop POSTs to /stops and replaces the draft", async () => {
+  const withStop = draft([{ order: 1, poi: poi("custom:x", "Mijn plek") }]);
+  const fetchMock = vi
+    .fn()
+    .mockResolvedValueOnce(mockJson(draft([]), 201)) // createDraft
+    .mockResolvedValueOnce(mockJson(withStop, 201)); // createCustomStop
+  vi.stubGlobal("fetch", fetchMock);
+  const { result } = renderHook(() => useDraft(), { wrapper });
+  await act(async () => { await result.current.createDraft({ start: { lat: 52.38, lon: 4.63 } }); });
+  await act(async () => { await result.current.addCustomStop({ name: "Mijn plek" }); });
+  expect(result.current.draft?.stops[0].poi.name).toBe("Mijn plek");
+  expect(fetchMock.mock.calls[1][0]).toBe("/api/drafts/d1/stops");
+});
