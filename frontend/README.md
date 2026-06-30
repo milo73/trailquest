@@ -137,7 +137,7 @@ The Stop editor (`StopEditor.tsx`) now loads, edits, and persists a stop's story
 
 - **Load/edit/save** — opening a stop populates the story and question fields from the draft stored on the server. Edits to either field autosave on blur via `PUT /drafts/{id}/stops/{order}` (body: `story`, `question`).
 - **Grounded generation ("Regenereer")** — checking one or more facts in the facts panel and optionally picking a tone, then clicking "Regenereer", calls `POST /drafts/{id}/stops/{order}/generate` (body: `fact_keys`, `tone`). The response fills the story and question fields with LLM-generated text grounded in the selected facts only — the LLM is not allowed to invent facts outside the supplied set.
-- **Tone selector** — a segmented control lets the author steer the register (e.g. `speels`, `historisch`, `mysterieus`). The selected tone is sent as the `tone` field in the generate request.
+- **Tone selector** — a dropdown lets the author steer the register (`speels`, `zakelijk`, `kindvriendelijk`, `verhalend`). The selected tone is sent as the `tone` field in the generate request.
 - **422 guard** — saving a gating question (Type A or D) with no stored answer returns a 422 from the backend; the editor surfaces this as a validation error so the author cannot accidentally create an unverifiable gate.
 
 **Manual smoke** (requires `npm run dev` + backend running):
