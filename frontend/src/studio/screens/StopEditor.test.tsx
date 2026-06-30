@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, test, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
@@ -130,4 +130,58 @@ test("shows the active draft stop's POI when one is selected", async () => {
   await userEvent.click(screen.getByText("seed"));
   const matches = await screen.findAllByText("Waag");
   expect(matches.length).toBeGreaterThan(0);
+});
+
+test("editing the story and blurring autosaves via PUT", async () => {
+  const draftWithStop = {
+    id: "d1", title: "t", city: "Haarlem", theme: "historical",
+    start: { lat: 52.38, lon: 4.63 }, requested_distance_km: 5, actual_distance_km: 1,
+    estimated_duration_min: 10,
+    stops: [{ order: 1, poi: { id: "p9", name: "Waag", location: { lat: 52.38, lon: 4.63 }, facts: [] }, story: "Oud verhaal.", question: { type: "C", prompt: "Wat denk je?", gates: false } }],
+    status: "concept", attributions: [],
+  };
+  const fetchMock = vi
+    .fn()
+    .mockResolvedValueOnce(new Response(JSON.stringify(draftWithStop), { status: 201 }))
+    .mockResolvedValue(new Response(JSON.stringify(draftWithStop), { status: 200 }));
+  vi.stubGlobal("fetch", fetchMock);
+  function Seed() {
+    const { setActiveStop, createDraft } = useDraft();
+    return <button onClick={async () => { await createDraft({ start: { lat: 52.38, lon: 4.63 } }); setActiveStop(1); }}>seed</button>;
+  }
+  render(<MemoryRouter><DraftProvider><Seed /><StopEditor /></DraftProvider></MemoryRouter>);
+  await userEvent.click(screen.getByText("seed"));
+  const textarea = await screen.findByLabelText("Verhaal");
+  await userEvent.clear(textarea);
+  await userEvent.type(textarea, "Nieuw verhaal.");
+  fireEvent.blur(textarea);
+  await waitFor(() => {
+    const putCall = fetchMock.mock.calls.find((c) => c[0] === "/api/drafts/d1/stops/1");
+    expect(putCall).toBeTruthy();
+    expect(JSON.parse(putCall![1].body).story).toBe("Nieuw verhaal.");
+  });
+});
+
+test("a Type-A question with no answer is blocked from saving", async () => {
+  const draftWithStop = {
+    id: "d1", title: "t", city: "Haarlem", theme: "historical",
+    start: { lat: 52.38, lon: 4.63 }, requested_distance_km: 5, actual_distance_km: 1,
+    estimated_duration_min: 10,
+    stops: [{ order: 1, poi: { id: "p9", name: "Waag", location: { lat: 52.38, lon: 4.63 }, facts: [] }, story: "", question: { type: "A", prompt: "Hoe hoog?", answer: "10", hint: null, gates: true } }],
+    status: "concept", attributions: [],
+  };
+  const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(draftWithStop), { status: 201 }));
+  vi.stubGlobal("fetch", fetchMock);
+  function Seed() {
+    const { setActiveStop, createDraft } = useDraft();
+    return <button onClick={async () => { await createDraft({ start: { lat: 52.38, lon: 4.63 } }); setActiveStop(1); }}>seed</button>;
+  }
+  render(<MemoryRouter><DraftProvider><Seed /><StopEditor /></DraftProvider></MemoryRouter>);
+  await userEvent.click(screen.getByText("seed"));
+  const answerInput = await screen.findByLabelText("Antwoord");
+  await userEvent.clear(answerInput);
+  fireEvent.blur(answerInput);
+  expect(await screen.findByText(/Antwoord verplicht/i)).toBeInTheDocument();
+  // the save was blocked: no PUT to the stop content endpoint was made
+  expect(fetchMock.mock.calls.filter((c) => String(c[0]).includes("/stops/1")).length).toBe(0);
 });
