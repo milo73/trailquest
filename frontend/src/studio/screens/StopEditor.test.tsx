@@ -186,6 +186,35 @@ test("a Type-A question with no answer is blocked from saving", async () => {
   expect(fetchMock.mock.calls.filter((c) => String(c[0]).includes("/stops/1")).length).toBe(0);
 });
 
+test("Regenereer generates from selected facts and fills the fields", async () => {
+  const fact = { key: "build_year", value: "1370", source: { name: "Wikidata", license: "CC0", reference: "q1" } };
+  const draftWithStop = {
+    id: "d1", title: "t", city: "Haarlem", theme: "historical",
+    start: { lat: 52.38, lon: 4.63 }, requested_distance_km: 5, actual_distance_km: 1,
+    estimated_duration_min: 10,
+    stops: [{ order: 1, poi: { id: "p9", name: "Waag", location: { lat: 52.38, lon: 4.63 }, facts: [fact] }, story: "", question: null }],
+    status: "concept", attributions: [],
+  };
+  const fetchMock = vi.fn((url: string, _init?: RequestInit) => {
+    if (String(url).endsWith("/generate"))
+      return Promise.resolve(new Response(JSON.stringify({ story: "Gegenereerd verhaal over 1370.", question: { type: "A", prompt: "In welk jaar?", answer: "1370", hint: null, gates: true } }), { status: 200 }));
+    return Promise.resolve(new Response(JSON.stringify(draftWithStop), { status: 201 }));
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  function Seed() {
+    const { setActiveStop, createDraft } = useDraft();
+    return <button onClick={async () => { await createDraft({ start: { lat: 52.38, lon: 4.63 } }); setActiveStop(1); }}>seed</button>;
+  }
+  render(<MemoryRouter><DraftProvider><Seed /><StopEditor /></DraftProvider></MemoryRouter>);
+  await userEvent.click(screen.getByText("seed"));
+  await userEvent.click(await screen.findByRole("button", { name: /Regenereer|Genereren/i }));
+  const textarea = await screen.findByLabelText("Verhaal");
+  await waitFor(() => expect((textarea as HTMLTextAreaElement).value).toContain("Gegenereerd verhaal"));
+  // the generate call carried the selected fact key
+  const genCall = fetchMock.mock.calls.find((c) => String(c[0]).endsWith("/generate"));
+  expect(JSON.parse((genCall![1] as RequestInit).body as string).fact_keys).toEqual(["build_year"]);
+});
+
 test("switching type A→C immediately saves with the NEW type, not the old one", async () => {
   // Start with a Type-A question (answer present so it's valid) and a fact so the
   // POI renders correctly. Switch to Type C via the select and assert the PUT body

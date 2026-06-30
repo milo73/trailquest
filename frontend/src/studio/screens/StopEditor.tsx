@@ -29,8 +29,15 @@ function countWords(text: string): number {
   return text.trim() === "" ? 0 : text.trim().split(/\s+/).length;
 }
 
+const TONES = [
+  { value: "speels", label: "Speels" },
+  { value: "zakelijk", label: "Zakelijk" },
+  { value: "kindvriendelijk", label: "Kindvriendelijk" },
+  { value: "verhalend", label: "Verhalend" },
+];
+
 export function StopEditor() {
-  const { draft, activeStopOrder, saveStopContent } = useDraft();
+  const { draft, activeStopOrder, saveStopContent, generateStopContent } = useDraft();
   const activeStop = draft?.stops.find((s) => s.order === activeStopOrder);
   const activePoi = activeStop?.poi ?? MOCK_STOP.poi;
   const sourceStory = activeStop ? (activeStop.story ?? "") : MOCK_STOP.story;
@@ -62,6 +69,8 @@ export function StopEditor() {
   const [questionType, setQuestionType] = useState<QuestionType>(sourceQuestion.type as QuestionType);
   const [gatesNext, setGatesNext] = useState<boolean>(Boolean(sourceQuestion.gates) && canGate(sourceQuestion.type as QuestionType));
   const [answerError, setAnswerError] = useState(false);
+  const [tone, setTone] = useState("speels");
+  const [regenerating, setRegenerating] = useState(false);
 
   useEffect(() => {
     setStory(sourceStory);
@@ -71,6 +80,24 @@ export function StopEditor() {
     setQuestionType(sourceQuestion.type as QuestionType);
     setGatesNext(Boolean(sourceQuestion.gates) && canGate(sourceQuestion.type as QuestionType));
   }, [activeStop?.order, activePoi.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function handleRegenerate() {
+    if (activeStopOrder === undefined) return;
+    const factKeys = activePoi.facts.filter((f) => includedFacts[f.key] ?? true).map((f) => f.key);
+    setRegenerating(true);
+    try {
+      const result = await generateStopContent(activeStopOrder, { fact_keys: factKeys, tone });
+      setStory(result.story);
+      setPrompt(result.question.prompt);
+      setAnswer(result.question.answer ?? "");
+      setHint(result.question.hint ?? "");
+      setQuestionType(result.question.type as QuestionType);
+      setGatesNext(Boolean(result.question.gates) && canGate(result.question.type as QuestionType));
+      await saveStopContent(activeStopOrder, { story: result.story, question: result.question });
+    } finally {
+      setRegenerating(false);
+    }
+  }
 
   function buildQuestionWith(type: QuestionType, gates: boolean): Question | null {
     const gating = canGate(type);
@@ -375,12 +402,31 @@ export function StopEditor() {
               >
                 AI-gegenereerd
               </span>
-              <div style={{ marginLeft: "auto", display: "flex", gap: 7 }}>
+              <div style={{ marginLeft: "auto", display: "flex", gap: 7, alignItems: "center" }}>
+                <select
+                  aria-label="Toon"
+                  value={tone}
+                  onChange={(e) => setTone(e.target.value)}
+                  style={{
+                    font: "500 11px/1 var(--tq-sans)",
+                    color: "#36322b",
+                    border: "1px solid #e6dcc6",
+                    borderRadius: 7,
+                    padding: "6px 8px",
+                    background: "#fdfbf6",
+                    cursor: "pointer",
+                  }}
+                >
+                  {TONES.map((t) => (
+                    <option key={t.value} value={t.value}>
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
                 <Button
                   variant="secondary"
-                  onClick={() => {
-                    /* no-op stub */
-                  }}
+                  onClick={handleRegenerate}
+                  disabled={regenerating}
                   style={{
                     height: "auto",
                     padding: "6px 10px",
@@ -392,7 +438,7 @@ export function StopEditor() {
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#b5453a" strokeWidth="2">
                     <path d="M21 12a9 9 0 1 1-3-6.7M21 4v5h-5" />
                   </svg>
-                  Regenereer
+                  {regenerating ? "Genereren…" : "Regenereer"}
                 </Button>
               </div>
             </div>
