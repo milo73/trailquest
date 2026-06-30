@@ -16,6 +16,7 @@ from app.models.schemas import (
     DraftStop,
     DraftTrail,
     DraftUpdate,
+    Question,
     Source,
     TrailRequest,
 )
@@ -103,3 +104,38 @@ def update(draft_id: str, req: DraftUpdate) -> DraftTrail | None:
     _measure(draft)
     drafts.put(draft)
     return draft
+
+
+def set_stop_content(
+    draft_id: str, order: int, *, story: str | None = None, question: Question | None = None
+) -> DraftTrail | None:
+    draft = drafts.get(draft_id)
+    if draft is None:
+        return None
+    stop = next((s for s in draft.stops if s.order == order), None)
+    if stop is None:
+        return None
+    if story is not None:
+        stop.story = story
+    if question is not None:
+        stop.question = question
+    draft.attributions = _attributions(draft.stops)
+    drafts.put(draft)
+    return draft
+
+
+def generate_stop_content(
+    draft_id: str, order: int, *, fact_keys: list[str] | None = None, tone: str | None = None
+) -> tuple[str, Question] | None:
+    draft = drafts.get(draft_id)
+    if draft is None:
+        return None
+    stop = next((s for s in draft.stops if s.order == order), None)
+    if stop is None:
+        return None
+    if fact_keys is None:
+        poi = stop.poi
+    else:
+        selected = [f for f in stop.poi.facts if f.key in set(fact_keys)]
+        poi = stop.poi.model_copy(update={"facts": selected})
+    return content_service.author_content(poi, draft.theme, tone)
