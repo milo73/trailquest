@@ -1,5 +1,6 @@
 import { apiFetch } from "./client";
 import type {
+  CustomStopRequest,
   DraftCreate,
   DraftTrail,
   DraftUpdate,
@@ -29,3 +30,6 @@ export const generateStopContent = (draftId: string, order: number, body: StopGe
     method: "POST",
     body: JSON.stringify(body),
   });
+
+export const createCustomStop = (draftId: string, body: CustomStopRequest) =>
+  apiFetch<DraftTrail>(`/drafts/${draftId}/stops`, { method: "POST", body: JSON.stringify(body) });

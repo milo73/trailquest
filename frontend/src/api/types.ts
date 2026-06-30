@@ -101,3 +101,9 @@ export interface StopGenerateResult {
   story: string;
   question: Question;
 }
+
+export interface CustomStopRequest {
+  name: string;
+  lat?: number;
+  lon?: number;
+}
