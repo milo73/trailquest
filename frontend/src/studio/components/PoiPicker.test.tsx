@@ -27,3 +27,16 @@ test("lists candidates (excluding already-added) and picks one", async () => {
   await userEvent.click(screen.getByText("Stadhuis"));
   expect(onPick).toHaveBeenCalledWith(pois[0]);
 });
+
+test("shows a loading state before the POI fetch resolves", async () => {
+  // a fetch that never resolves within the test → loading text stays
+  vi.stubGlobal("fetch", vi.fn(() => new Promise(() => {})));
+  render(<PoiPicker start={{ lat: 52.38, lon: 4.63 }} excludeIds={[]} onPick={() => {}} onClose={() => {}} />);
+  expect(screen.getByText(/laden/i)).toBeInTheDocument();
+});
+
+test("shows an error message when the POI fetch fails", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("nope", { status: 500 })));
+  render(<PoiPicker start={{ lat: 52.38, lon: 4.63 }} excludeIds={[]} onPick={() => {}} onClose={() => {}} />);
+  expect(await screen.findByText(/Kon POI's niet laden/i)).toBeInTheDocument();
+});
