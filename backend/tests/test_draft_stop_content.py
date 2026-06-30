@@ -17,7 +17,12 @@ def _clear():
 def _draft_with_one_stop():
     d = draft_service.create(DraftCreate(start=HAARLEM))
     poi_id = poi_service.candidates(HAARLEM, 5)[0].id
-    draft_service.update(d.id, __import__("app.models.schemas", fromlist=["DraftUpdate"]).DraftUpdate(stop_poi_ids=[poi_id]))
+    draft_service.update(
+        d.id,
+        __import__("app.models.schemas", fromlist=["DraftUpdate"]).DraftUpdate(
+            stop_poi_ids=[poi_id]
+        ),
+    )
     return draft_service.get(d.id)
 
 

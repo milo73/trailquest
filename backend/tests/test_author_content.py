@@ -8,7 +8,13 @@ def _poi() -> POI:
         id="p1",
         name="Sint-Bavokerk",
         location=GeoPoint(lat=52.38, lon=4.63),
-        facts=[Fact(key="height_m", value="78", source=Source(name="Wikidata", license=SourceLicense.CC0, reference="q1"))],
+        facts=[
+            Fact(
+                key="height_m",
+                value="78",
+                source=Source(name="Wikidata", license=SourceLicense.CC0, reference="q1"),
+            )
+        ],
     )
 
 
