@@ -112,6 +112,8 @@ mypy app                        # type-check
 | `GET` | `/drafts` | List all draft trails |
 | `GET` | `/drafts/{id}` | Fetch a single draft trail |
 | `PUT` | `/drafts/{id}` | Update a draft trail (title, stops, status, etc.) |
+| `PUT` | `/drafts/{id}/stops/{order}` | Save a stop's story and question; returns 422 if the question is a gating type (A or D) with no stored answer |
+| `POST` | `/drafts/{id}/stops/{order}/generate` | RAG-generate a grounded story and candidate question from the selected facts; body: `fact_keys` (list of fact key strings to ground the generation) and `tone` (optional string, e.g. `"speels"`) |
 
 ## Status
 

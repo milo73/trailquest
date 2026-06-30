@@ -131,6 +131,24 @@ src/
 | Studio route measurement (`POST /routes/measure`) | yes | — |
 | Studio "Genereer concept" | yes | — |
 
+### Stop authoring
+
+The Stop editor (`StopEditor.tsx`) now loads, edits, and persists a stop's story and question via the FastAPI backend:
+
+- **Load/edit/save** — opening a stop populates the story and question fields from the draft stored on the server. Edits to either field autosave on blur via `PUT /drafts/{id}/stops/{order}` (body: `story`, `question`).
+- **Grounded generation ("Regenereer")** — checking one or more facts in the facts panel and optionally picking a tone, then clicking "Regenereer", calls `POST /drafts/{id}/stops/{order}/generate` (body: `fact_keys`, `tone`). The response fills the story and question fields with LLM-generated text grounded in the selected facts only — the LLM is not allowed to invent facts outside the supplied set.
+- **Tone selector** — a segmented control lets the author steer the register (e.g. `speels`, `historisch`, `mysterieus`). The selected tone is sent as the `tone` field in the generate request.
+- **422 guard** — saving a gating question (Type A or D) with no stored answer returns a 422 from the backend; the editor surfaces this as a validation error so the author cannot accidentally create an unverifiable gate.
+
+**Manual smoke** (requires `npm run dev` + backend running):
+
+- Open `http://localhost:5173/studio` → click a draft → click a stop row to open the Stop editor
+- Edit the story text; click outside the field (blur) → the change autosaves (reload confirms it persists)
+- Check one or more facts in the facts panel; pick a tone from the tone selector; click "Regenereer" → the story and question fields fill with grounded content
+- Reload the page — the generated story and question are retained on the server
+
+---
+
 ### Studio route creation
 
 The creator studio now manages real draft trails backed by the FastAPI backend:
