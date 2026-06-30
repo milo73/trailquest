@@ -1,6 +1,6 @@
 import { createContext, useContext, useMemo, useState } from "react";
-import { createDraft as apiCreate, getDraft, updateDraft } from "../api/drafts";
-import type { DraftCreate, DraftStop, DraftTrail, POI } from "../api/types";
+import { createDraft as apiCreate, getDraft, updateDraft, updateStopContent, generateStopContent as apiGenerateStopContent } from "../api/drafts";
+import type { DraftCreate, DraftStop, DraftTrail, POI, StopContentUpdate, StopGenerateRequest, StopGenerateResult } from "../api/types";
 
 const STORAGE_KEY = "tq.studio.draft";
 
@@ -13,6 +13,8 @@ interface DraftApi {
   removeStop: (order: number) => Promise<void>;
   reorder: (order: number, dir: "up" | "down") => Promise<void>;
   setActiveStop: (order: number) => void;
+  saveStopContent: (order: number, content: StopContentUpdate) => Promise<void>;
+  generateStopContent: (order: number, body: StopGenerateRequest) => Promise<StopGenerateResult>;
 }
 
 const Ctx = createContext<DraftApi | null>(null);
@@ -67,6 +69,15 @@ export function DraftProvider({ children }: { children: React.ReactNode }) {
         await save({ ...draft, stops: renumber(swapped) });
       },
       setActiveStop: (order) => setActiveStopOrder(order),
+      saveStopContent: async (order, content) => {
+        if (!draft) return;
+        const saved = await updateStopContent(draft.id, order, content);
+        setDraft(saved);
+      },
+      generateStopContent: async (order, body) => {
+        if (!draft) throw new Error("generateStopContent: no active draft");
+        return apiGenerateStopContent(draft.id, order, body);
+      },
     };
   }, [draft, activeStopOrder]);
 
