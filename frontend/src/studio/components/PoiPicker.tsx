@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { getPois } from "../../api/pois";
-import { ApiError } from "../../api/client";
 import type { GeoPoint, POI } from "../../api/types";
 
 interface Props {

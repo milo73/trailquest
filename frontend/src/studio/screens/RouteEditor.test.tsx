@@ -1,5 +1,6 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { fireEvent, waitFor } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import { DraftProvider, useDraft } from "../draftStore";
@@ -55,6 +56,7 @@ test("opening the picker and choosing a candidate calls addStop (PUT)", async ()
   render(<MemoryRouter><DraftProvider><Harness seed={seeded} /></DraftProvider></MemoryRouter>);
   await userEvent.click(screen.getByText("seed"));
   await userEvent.click(await screen.findByRole("button", { name: /Stop toevoegen/i }));
+  await userEvent.click(screen.getByRole("button", { name: /Kies uit de buurt/i }));
   const dialog = await screen.findByRole("dialog");
   await userEvent.click(within(dialog).getByText("Vleeshal"));
 
@@ -64,4 +66,42 @@ test("opening the picker and choosing a candidate calls addStop (PUT)", async ()
   expect(putCall).toBeTruthy();
   const putInit = putCall![1] as RequestInit;
   expect(JSON.parse(putInit.body as string).stop_poi_ids).toEqual(["c1"]);
+});
+
+test("the add-stop chooser opens the custom form and addCustomStop is called", async () => {
+  const seeded = draft([]); // helper from the file
+  const fetchMock = vi.fn((url: string) => {
+    if (url === "/api/drafts/d1/stops")
+      return Promise.resolve(new Response(JSON.stringify(draft([{ order: 1, poi: poi("custom:x", "Mijn plek") }])), { status: 201 }));
+    return Promise.resolve(new Response(JSON.stringify(seeded), { status: 201 })); // createDraft
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  render(<MemoryRouter><DraftProvider><Harness seed={seeded} /></DraftProvider></MemoryRouter>);
+  await userEvent.click(screen.getByText("seed"));
+  await userEvent.click(await screen.findByRole("button", { name: /Stop toevoegen/i }));
+  await userEvent.click(screen.getByRole("button", { name: /Maak een nieuwe stop/i }));
+  const dialog = await screen.findByRole("dialog", { name: /Nieuwe stop/i });
+  await userEvent.type(within(dialog).getByLabelText("Naam"), "Mijn plek");
+  await userEvent.click(within(dialog).getByRole("button", { name: /Toevoegen/i }));
+  await waitFor(() => expect(fetchMock.mock.calls.some((c) => c[0] === "/api/drafts/d1/stops")).toBe(true));
+});
+
+test("editing the route title and blurring renames the draft", async () => {
+  const seeded = draft([]);
+  const fetchMock = vi
+    .fn()
+    .mockResolvedValueOnce(new Response(JSON.stringify(seeded), { status: 201 })) // createDraft
+    .mockResolvedValue(new Response(JSON.stringify({ ...seeded, title: "Mijn route" }), { status: 200 })); // updateDraft
+  vi.stubGlobal("fetch", fetchMock);
+  render(<MemoryRouter><DraftProvider><Harness seed={seeded} /></DraftProvider></MemoryRouter>);
+  await userEvent.click(screen.getByText("seed"));
+  const title = await screen.findByLabelText("Tochtnaam");
+  await userEvent.clear(title);
+  await userEvent.type(title, "Mijn route");
+  fireEvent.blur(title);
+  await waitFor(() => {
+    const put = fetchMock.mock.calls.find((c) => c[0] === "/api/drafts/d1" && c[1]?.method === "PUT");
+    expect(put).toBeTruthy();
+    expect(JSON.parse(put![1].body)).toEqual({ title: "Mijn route" });
+  });
 });
