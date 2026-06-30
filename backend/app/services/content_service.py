@@ -86,6 +86,26 @@ def build_stop(poi: POI, theme: Theme, order: int) -> Stop:
     return stop
 
 
+def author_content(poi: POI, theme: Theme, tone: str | None = None) -> tuple[str, Question]:
+    """Generate authoring content (story + candidate question) for one POI.
+
+    Unlike :func:`build_stop` this never reads or writes the (POI × theme) cache —
+    the studio author wants fresh output scoped to the facts they selected (the
+    caller passes a POI carrying only those facts). Degrades to the stub on any
+    provider failure (PRD §13).
+    """
+    question = _build_question(poi)
+    try:
+        story = get_llm_provider().rephrase(
+            poi_name=poi.name, theme=theme, facts=poi.facts, background=poi.background, tone=tone
+        )
+    except RuntimeError:
+        story = StubProvider().rephrase(
+            poi_name=poi.name, theme=theme, facts=poi.facts, background=poi.background, tone=tone
+        )
+    return story, question
+
+
 def collect_attributions(sources: list[Source]) -> list[str]:
     """Deduplicated source attributions to carry through to display (PRD §10)."""
     seen: dict[str, str] = {}
