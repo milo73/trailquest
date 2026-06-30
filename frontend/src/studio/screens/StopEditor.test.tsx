@@ -185,3 +185,58 @@ test("a Type-A question with no answer is blocked from saving", async () => {
   // the save was blocked: no PUT to the stop content endpoint was made
   expect(fetchMock.mock.calls.filter((c) => String(c[0]).includes("/stops/1")).length).toBe(0);
 });
+
+test("switching type A→C immediately saves with the NEW type, not the old one", async () => {
+  // Start with a Type-A question (answer present so it's valid) and a fact so the
+  // POI renders correctly. Switch to Type C via the select and assert the PUT body
+  // carries question.type === "C", not the stale "A".
+  const draftWithStop = {
+    id: "d1", title: "t", city: "Haarlem", theme: "historical",
+    start: { lat: 52.38, lon: 4.63 }, requested_distance_km: 5, actual_distance_km: 1,
+    estimated_duration_min: 10,
+    stops: [{
+      order: 1,
+      poi: {
+        id: "p-waag",
+        name: "Waag",
+        location: { lat: 52.38, lon: 4.63 },
+        facts: [{
+          key: "build_year",
+          value: "1370",
+          source: { name: "Wikidata", license: "CC0", reference: "https://www.wikidata.org/wiki/Q1234" },
+        }],
+      },
+      story: "Oud gebouw.",
+      question: { type: "A", prompt: "Wanneer gebouwd?", answer: "1370", hint: null, gates: true },
+    }],
+    status: "concept", attributions: [],
+  };
+  const fetchMock = vi
+    .fn()
+    .mockResolvedValueOnce(new Response(JSON.stringify(draftWithStop), { status: 201 }))
+    .mockResolvedValue(new Response(JSON.stringify(draftWithStop), { status: 200 }));
+  vi.stubGlobal("fetch", fetchMock);
+  function Seed() {
+    const { setActiveStop, createDraft } = useDraft();
+    return (
+      <button onClick={async () => { await createDraft({ start: { lat: 52.38, lon: 4.63 } }); setActiveStop(1); }}>
+        seed
+      </button>
+    );
+  }
+  render(<MemoryRouter><DraftProvider><Seed /><StopEditor /></DraftProvider></MemoryRouter>);
+  await userEvent.click(screen.getByText("seed"));
+  // Wait for stop to load (answer field visible when type is A)
+  await screen.findByLabelText("Antwoord");
+
+  // Switch type from A to C — this should immediately PUT with type "C"
+  await userEvent.selectOptions(screen.getByLabelText(/Vraagtype/i), "C");
+
+  await waitFor(() => {
+    const putCalls = fetchMock.mock.calls.filter((c) => String(c[0]) === "/api/drafts/d1/stops/1");
+    expect(putCalls.length).toBeGreaterThan(0);
+    const lastPut = putCalls[putCalls.length - 1];
+    const body = JSON.parse(lastPut[1].body);
+    expect(body.question.type).toBe("C");
+  });
+});

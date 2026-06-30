@@ -72,27 +72,31 @@ export function StopEditor() {
     setGatesNext(Boolean(sourceQuestion.gates) && canGate(sourceQuestion.type as QuestionType));
   }, [activeStop?.order, activePoi.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  function buildQuestion(): Question | null {
-    const gating = canGate(questionType);
+  function buildQuestionWith(type: QuestionType, gates: boolean): Question | null {
+    const gating = canGate(type);
     if (gating && answer.trim() === "") {
       setAnswerError(true);
       return null;
     }
     setAnswerError(false);
     return {
-      type: questionType,
+      type,
       prompt,
       answer: gating ? answer : null,
       hint: hint || null,
-      gates: gating && gatesNext,
+      gates: gating && gates,
     };
   }
 
-  async function saveQuestion() {
+  async function saveQuestionWith(type: QuestionType, gates: boolean) {
     if (activeStopOrder === undefined) return;
-    const q = buildQuestion();
-    if (q === null) return; // blocked: A/D needs an answer
+    const q = buildQuestionWith(type, gates);
+    if (q === null) return;
     await saveStopContent(activeStopOrder, { question: q });
+  }
+
+  async function saveQuestion() {
+    return saveQuestionWith(questionType, gatesNext);
   }
 
   async function saveStory() {
@@ -562,8 +566,9 @@ export function StopEditor() {
                   aria-label="Vraagtype"
                   value={questionType}
                   onChange={(e) => {
-                    handleTypeChange(e.target.value as QuestionType);
-                    saveQuestion();
+                    const newType = e.target.value as QuestionType;
+                    handleTypeChange(newType);
+                    void saveQuestionWith(newType, canGate(newType) ? gatesNext : false);
                   }}
                   style={{
                     width: "100%",
@@ -606,8 +611,9 @@ export function StopEditor() {
                     disabled={gateDisabled}
                     onChange={(e) => {
                       if (!gateDisabled) {
-                        setGatesNext(e.target.checked);
-                        saveQuestion();
+                        const checked = e.target.checked;
+                        setGatesNext(checked);
+                        void saveQuestionWith(questionType, checked);
                       }
                     }}
                     style={{ width: 30, height: 18, cursor: gateDisabled ? "not-allowed" : "pointer" }}
