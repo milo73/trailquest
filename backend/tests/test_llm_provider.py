@@ -53,7 +53,7 @@ def test_stub_is_grounded_in_facts() -> None:
 
 def test_factless_poi_gets_non_factual_line() -> None:
     story = StubProvider().rephrase(poi_name="Square", theme=Theme.MIXED, facts=[])
-    assert story == "Square is part of your trail."
+    assert story == "Square is onderdeel van je speurtocht."
 
 
 def test_real_provider_rephrase_builds_grounded_prompt() -> None:
@@ -70,5 +70,5 @@ def test_real_provider_rephrase_builds_grounded_prompt() -> None:
         poi_name="Tower", theme=Theme.ARCHITECTURE, facts=[_fact("height_m", "78")]
     )
     assert out == "generated"
-    assert "invent" in captured["system"].lower()
+    assert "verzin" in captured["system"].lower()
     assert "78" in captured["prompt"] and "architecture" in captured["prompt"]
