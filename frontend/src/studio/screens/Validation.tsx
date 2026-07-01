@@ -254,15 +254,35 @@ export function Validation() {
                       )}
                     </div>
 
-                    {/* Meta (ok rows only) */}
+                    {/* Status label */}
                     {isOk && (
                       <span
                         style={{
                           font: "600 12px/1 var(--tq-mono)",
-                          color: "#3a5a2f",
+                          color: "var(--tq-green-ink, #3a5a2f)",
                         }}
                       >
-                        {check.detail}
+                        ok
+                      </span>
+                    )}
+                    {isWarning && (
+                      <span
+                        style={{
+                          font: "600 12px/1 var(--tq-mono)",
+                          color: "var(--tq-gold-ink, #c5912f)",
+                        }}
+                      >
+                        waarschuwing
+                      </span>
+                    )}
+                    {isBlocking && (
+                      <span
+                        style={{
+                          font: "600 12px/1 var(--tq-mono)",
+                          color: "var(--tq-terracotta-deep, #b5453a)",
+                        }}
+                      >
+                        blokkerend
                       </span>
                     )}
                   </div>
