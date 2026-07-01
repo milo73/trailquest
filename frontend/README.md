@@ -115,7 +115,7 @@ src/
         ├── RouteEditor.tsx  stop list + reorder controls
         ├── StopEditor.tsx   stop detail — content, question type, gate toggle
         │                    (Type B forces gate off per content-accuracy constraint)
-        └── Validation.tsx   pre-publish checks → publish to moderation queue
+        └── Validation.tsx   pre-publish validation screen — server-computed report (per-stop grounding, blocking/warning counts, can_publish); "Publiceer" button is disabled while blocking > 0; on success sets the draft to `review`
 ```
 
 ### What is backend-wired vs. client-side / mock
@@ -130,6 +130,8 @@ src/
 | Studio POI catalog (`GET /pois`) | yes | — |
 | Studio route measurement (`POST /routes/measure`) | yes | — |
 | Studio "Genereer concept" | yes | — |
+| Studio validation (`GET /drafts/{id}/validation`) | yes | — |
+| Studio publish (`POST /drafts/{id}/publish`) | yes | — |
 
 ### Stop authoring
 
@@ -181,9 +183,34 @@ The route and stop editors have been extended with the following capabilities:
 
 ---
 
+### Studio — validation and publish
+
+The Validation screen is now backed by the FastAPI backend. Clicking "Publiceren" in the Route editor navigates to `/studio/validation`, which calls `GET /drafts/{id}/validation` and displays a server-computed report.
+
+**Blocking rules** (a draft cannot be published while any of these apply):
+
+- Fewer than 2 stops
+- A stop has incomplete content (empty story or question)
+- A stop is factless (a custom stop with no grounded facts — no verifiable question can be generated)
+
+**Warnings** (informational only; do not block publish):
+
+- Trail distance is outside the recommended tolerance
+
+When all blocking issues are resolved (`can_publish: true`) the "Publiceer" button becomes active. Clicking it calls `POST /drafts/{id}/publish`, which re-validates server-side; if any blocking issue arose since the last check the endpoint returns 409 and the screen shows an error. On success the draft status is set to `review` and the user is returned to the dashboard.
+
+**Manual smoke** (requires `npm run dev` + backend running):
+
+- Open `http://localhost:5173/studio` → open a draft → click "Publiceren" in the Route editor → the Validation screen loads showing real per-stop grounding from the server.
+- Add a factless custom stop (custom-stop tab, no coordinates) → confirm the screen shows a blocking issue and the "Publiceer" button is disabled.
+- Remove the factless stop → the blocking count drops to zero and "Publiceer" becomes active.
+- Click "Publiceer" → the dashboard reloads and shows the trail card with status "In review".
+
+---
+
 ## Automated smoke results
 
-Run against commit on branch `feat/studio-editor-fixes`.
+Run against commit on branch `feat/studio-validation`.
 
 ### Typecheck (`npm run typecheck`)
 
@@ -196,12 +223,12 @@ exit 0
 
 ```
 Test Files  21 passed (21)
-      Tests  59 passed (59)
+      Tests  63 passed (63)
    Duration  ~1.3s
 ```
 
 Test files:
-- `src/api/drafts.test.ts` (6)
+- `src/api/drafts.test.ts` (8)
 - `src/api/trails.test.ts` (2)
 - `src/quester/gamification.test.ts` (5)
 - `src/quester/store.test.tsx` (3)
@@ -217,9 +244,9 @@ Test files:
 - `src/studio/components/PoiPicker.test.tsx` (3)
 - `src/studio/draftStore.test.tsx` (8)
 - `src/studio/screens/Dashboard.test.tsx` (3)
-- `src/studio/screens/RouteEditor.test.tsx` (4)
+- `src/studio/screens/RouteEditor.test.tsx` (5)
 - `src/studio/screens/StopEditor.test.tsx` (11)
-- `src/studio/screens/Validation.test.tsx` (1)
+- `src/studio/screens/Validation.test.tsx` (2)
 - `src/studio/StudioChrome.test.tsx` (1)
 - `src/App.test.tsx` (1)
 
@@ -229,11 +256,11 @@ Note: React Router v6 emits two "Future Flag Warning" lines during studio and pl
 
 ```
 vite v5.4.21 building for production...
-69 modules transformed.
+68 modules transformed.
 dist/index.html                   0.40 kB │ gzip:  0.27 kB
 dist/assets/index-DSq2xkZK.css    1.31 kB │ gzip:  0.64 kB
-dist/assets/index-ByF_a8Kc.js   255.95 kB │ gzip: 73.44 kB
-built in 308ms
+dist/assets/index-uIPGfuYn.js   257.10 kB │ gzip: 73.58 kB
+built in 304ms
 exit 0
 ```
 
@@ -263,7 +290,7 @@ Run these manually after `npm run dev` with the backend running (see above).
 - [ ] Dashboard shows existing draft trail cards with stats (from server)
 - [ ] Click a trail card → Route editor shows the stop list; use move-up/down controls to reorder — distance meter updates after each change
 - [ ] Open Stop editor for a stop; change question type to **Type B** — verify the "Gate" toggle disables automatically
-- [ ] Open Validation screen; review pre-publish warnings; click "Publiceer" → confirmation shown
+- [ ] Open Validation screen; the report loads with real per-stop grounding from the server; if no blocking issues, click "Publiceer" → draft status becomes "In review" on the dashboard
 
 ### Studio — route creation (new)
 
