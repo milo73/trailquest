@@ -262,3 +262,31 @@ class CustomStopRequest(BaseModel):
     name: str
     lat: float | None = None
     lon: float | None = None
+
+
+class CheckStatus(StrEnum):
+    OK = "ok"
+    WARNING = "warning"
+    BLOCKING = "blocking"
+
+
+class StopGrounding(BaseModel):
+    order: int
+    name: str
+    grounded: bool
+    sources: str
+
+
+class ValidationCheck(BaseModel):
+    id: str
+    label: str
+    detail: str
+    status: CheckStatus
+
+
+class ValidationResult(BaseModel):
+    checks: list[ValidationCheck]
+    per_stop: list[StopGrounding]
+    blocking: int
+    warnings: int
+    can_publish: bool

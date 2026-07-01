@@ -13,6 +13,7 @@ from app.cache.store import drafts
 from app.config import settings
 from app.models.schemas import (
     POI,
+    CheckStatus,
     DraftCreate,
     DraftStop,
     DraftTrail,
@@ -20,7 +21,10 @@ from app.models.schemas import (
     GeoPoint,
     Question,
     Source,
+    StopGrounding,
     TrailRequest,
+    ValidationCheck,
+    ValidationResult,
 )
 from app.services import content_service, poi_service, route_service
 
@@ -141,6 +145,74 @@ def generate_stop_content(
         selected = [f for f in stop.poi.facts if f.key in set(fact_keys)]
         poi = stop.poi.model_copy(update={"facts": selected})
     return content_service.author_content(poi, draft.theme, tone)
+
+
+def validate(draft: DraftTrail) -> ValidationResult:
+    """Compute the pre-publish report for a draft (PRD: quality is a gate)."""
+    stops = draft.stops
+    per_stop: list[StopGrounding] = []
+    for s in stops:
+        source_names = sorted({f.source.name for f in s.poi.facts})
+        per_stop.append(
+            StopGrounding(
+                order=s.order,
+                name=s.poi.name,
+                grounded=len(s.poi.facts) > 0,
+                sources=" · ".join(source_names) if source_names else "geen feiten",
+            )
+        )
+
+    checks: list[ValidationCheck] = []
+
+    checks.append(
+        ValidationCheck(
+            id="stops",
+            label="Stops",
+            detail=f"{len(stops)} stops",
+            status=CheckStatus.BLOCKING if len(stops) < 2 else CheckStatus.OK,
+        )
+    )
+
+    complete = [s for s in stops if s.story and s.story.strip() and s.question is not None]
+    checks.append(
+        ValidationCheck(
+            id="content",
+            label="Inhoud compleet",
+            detail=f"{len(complete)} / {len(stops)} stops hebben verhaal + opdracht",
+            status=CheckStatus.BLOCKING if len(complete) < len(stops) else CheckStatus.OK,
+        )
+    )
+
+    grounded = [s for s in stops if s.poi.facts]
+    checks.append(
+        ValidationCheck(
+            id="grounding",
+            label="Grounding",
+            detail=f"{len(grounded)} / {len(stops)} stops met verifieerbare feiten",
+            status=CheckStatus.BLOCKING if len(grounded) < len(stops) else CheckStatus.OK,
+        )
+    )
+
+    req = draft.requested_distance_km
+    out_of_tolerance = req > 0 and abs(draft.actual_distance_km - req) > 0.15 * req
+    checks.append(
+        ValidationCheck(
+            id="distance",
+            label="Afstandstolerantie",
+            detail=f"{draft.actual_distance_km} km — doel {req} km (±15%)",
+            status=CheckStatus.WARNING if out_of_tolerance else CheckStatus.OK,
+        )
+    )
+
+    blocking = sum(1 for c in checks if c.status == CheckStatus.BLOCKING)
+    warnings = sum(1 for c in checks if c.status == CheckStatus.WARNING)
+    return ValidationResult(
+        checks=checks,
+        per_stop=per_stop,
+        blocking=blocking,
+        warnings=warnings,
+        can_publish=blocking == 0,
+    )
 
 
 def add_custom_stop(
