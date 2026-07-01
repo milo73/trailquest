@@ -13,14 +13,28 @@ test("canGate only allows A and D", () => {
 });
 
 test("selecting type B disables and forces off the gate toggle", async () => {
+  const draftWithStop = {
+    id: "d1", title: "t", city: "Haarlem", theme: "historical",
+    start: { lat: 52.38, lon: 4.63 }, requested_distance_km: 5, actual_distance_km: 1,
+    estimated_duration_min: 10,
+    stops: [{ order: 1, poi: { id: "p1", name: "Waag", location: { lat: 52.38, lon: 4.63 }, facts: [] }, story: "s", question: { type: "A", prompt: "q", answer: "a", hint: null, gates: true } }],
+    status: "concept", attributions: [],
+  };
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(draftWithStop), { status: 201 })));
+  function Seed() {
+    const { setActiveStop, createDraft } = useDraft();
+    return <button onClick={async () => { await createDraft({ start: { lat: 52.38, lon: 4.63 } }); setActiveStop(1); }}>seed</button>;
+  }
   render(
     <MemoryRouter>
       <DraftProvider>
+        <Seed />
         <StopEditor />
       </DraftProvider>
     </MemoryRouter>,
   );
-  const gate = screen.getByRole("switch", { name: /gaten/i });
+  await userEvent.click(screen.getByText("seed"));
+  const gate = await screen.findByRole("switch", { name: /gaten/i });
   expect(gate).toBeChecked(); // starts as Type A, gate on
   await userEvent.selectOptions(screen.getByLabelText(/Vraagtype/i), "B");
   expect(gate).toBeDisabled();
@@ -28,14 +42,28 @@ test("selecting type B disables and forces off the gate toggle", async () => {
 });
 
 test("verhaal word count updates as you edit", async () => {
+  const draftWithStop = {
+    id: "d1", title: "t", city: "Haarlem", theme: "historical",
+    start: { lat: 52.38, lon: 4.63 }, requested_distance_km: 5, actual_distance_km: 1,
+    estimated_duration_min: 10,
+    stops: [{ order: 1, poi: { id: "p1", name: "Waag", location: { lat: 52.38, lon: 4.63 }, facts: [] }, story: "s", question: { type: "A", prompt: "q", answer: "a", hint: null, gates: true } }],
+    status: "concept", attributions: [],
+  };
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(draftWithStop), { status: 201 })));
+  function Seed() {
+    const { setActiveStop, createDraft } = useDraft();
+    return <button onClick={async () => { await createDraft({ start: { lat: 52.38, lon: 4.63 } }); setActiveStop(1); }}>seed</button>;
+  }
   render(
     <MemoryRouter>
       <DraftProvider>
+        <Seed />
         <StopEditor />
       </DraftProvider>
     </MemoryRouter>,
   );
-  const textarea = screen.getByLabelText(/Verhaal/i);
+  await userEvent.click(screen.getByText("seed"));
+  const textarea = await screen.findByLabelText(/Verhaal/i);
   await userEvent.clear(textarea);
   await userEvent.type(textarea, "een twee drie");
   expect(screen.getByText(/3 woorden/)).toBeInTheDocument();
@@ -315,4 +343,31 @@ test("switching type A→C immediately saves with the NEW type, not the old one"
     const body = JSON.parse(lastPut[1].body);
     expect(body.question.type).toBe("C");
   });
+});
+
+test("with no active stop, shows the hint and no Regenereer button", async () => {
+  localStorage.clear();
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({}), { status: 200 })));
+  render(<MemoryRouter><DraftProvider><StopEditor /></DraftProvider></MemoryRouter>);
+  expect(await screen.findByText(/Geen stop geselecteerd/i)).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /Regenereer|Genereren/i })).toBeNull();
+});
+
+test("the location shows the active stop's real coordinates, not Haarlem/mock", async () => {
+  const draftWithStop = {
+    id: "d1", title: "t", city: "Amsterdam", theme: "historical",
+    start: { lat: 52.37, lon: 4.90 }, requested_distance_km: 5, actual_distance_km: 1,
+    estimated_duration_min: 10,
+    stops: [{ order: 1, poi: { id: "p1", name: "Waag", location: { lat: 52.3728, lon: 4.9036 }, facts: [] }, story: "s", question: null }],
+    status: "concept", attributions: [],
+  };
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(draftWithStop), { status: 201 })));
+  function Seed() {
+    const { setActiveStop, createDraft } = useDraft();
+    return <button onClick={async () => { await createDraft({ start: { lat: 52.37, lon: 4.90 } }); setActiveStop(1); }}>seed</button>;
+  }
+  render(<MemoryRouter><DraftProvider><Seed /><StopEditor /></DraftProvider></MemoryRouter>);
+  await userEvent.click(screen.getByText("seed"));
+  expect(await screen.findByText(/52\.3728/)).toBeInTheDocument();   // real lat, not the mock
+  expect(screen.getByText(/Amsterdam/)).toBeInTheDocument();          // draft city, not "Grote Markt 22, Haarlem"
 });
