@@ -7,6 +7,7 @@ import type {
   StopContentUpdate,
   StopGenerateRequest,
   StopGenerateResult,
+  ValidationResult,
 } from "./types";
 
 export const createDraft = (req: DraftCreate) =>
@@ -33,3 +34,9 @@ export const generateStopContent = (draftId: string, order: number, body: StopGe
 
 export const createCustomStop = (draftId: string, body: CustomStopRequest) =>
   apiFetch<DraftTrail>(`/drafts/${draftId}/stops`, { method: "POST", body: JSON.stringify(body) });
+
+export const getValidation = (draftId: string) =>
+  apiFetch<ValidationResult>(`/drafts/${draftId}/validation`);
+
+export const publishDraft = (draftId: string) =>
+  apiFetch<DraftTrail>(`/drafts/${draftId}/publish`, { method: "POST" });

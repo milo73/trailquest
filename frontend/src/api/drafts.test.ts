@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from "vitest";
-import { createDraft, updateDraft, updateStopContent, generateStopContent, createCustomStop } from "./drafts";
+import { createDraft, updateDraft, updateStopContent, generateStopContent, createCustomStop, getValidation, publishDraft } from "./drafts";
 import { getPois } from "./pois";
 
 afterEach(() => vi.restoreAllMocks());
@@ -64,4 +64,26 @@ test("createCustomStop POSTs name + coords to the draft stops path", async () =>
   expect(url).toBe("/api/drafts/d1/stops");
   expect(init.method).toBe("POST");
   expect(JSON.parse(init.body)).toEqual({ name: "Mijn plek", lat: 52.39, lon: 4.64 });
+});
+
+test("getValidation GETs the validation path", async () => {
+  const report = { checks: [], per_stop: [], blocking: 0, warnings: 0, can_publish: true };
+  const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(report), { status: 200 }));
+  vi.stubGlobal("fetch", fetchMock);
+  const res = await getValidation("d1");
+  expect(res.can_publish).toBe(true);
+  expect(fetchMock.mock.calls[0][0]).toBe("/api/drafts/d1/validation");
+});
+
+test("publishDraft POSTs to the publish path and throws ApiError on 409", async () => {
+  const fetchMock = vi
+    .fn()
+    .mockResolvedValueOnce(new Response(JSON.stringify({ id: "d1", status: "review" }), { status: 200 }));
+  vi.stubGlobal("fetch", fetchMock);
+  await publishDraft("d1");
+  expect(fetchMock.mock.calls[0][0]).toBe("/api/drafts/d1/publish");
+  expect(fetchMock.mock.calls[0][1].method).toBe("POST");
+
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ detail: "Kan niet publiceren" }), { status: 409 })));
+  await expect(publishDraft("d1")).rejects.toMatchObject({ name: "ApiError", status: 409 });
 });
