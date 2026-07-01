@@ -25,11 +25,19 @@ from app.services.llm.provider import StubProvider
 
 # Fact keys we know how to turn into a data-bound (Type-A) question, with phrasing.
 _DATA_BOUND_TEMPLATES: dict[str, str] = {
-    "height_m": "How tall is {name}, in metres?",
-    "build_year": "In which year was {name} built?",
-    "build_year_start": "In which year did construction of {name} begin?",
-    "founded_year": "In which year was {name} founded?",
-    "architect": "Who was the architect of {name}?",
+    "height_m": "Hoe hoog is {name}, in meters?",
+    "build_year": "In welk jaar is {name} gebouwd?",
+    "build_year_start": "In welk jaar begon de bouw van {name}?",
+    "founded_year": "In welk jaar is {name} opgericht?",
+    "architect": "Wie was de architect van {name}?",
+}
+
+_HINT_LABELS: dict[str, str] = {
+    "height_m": "hoogte",
+    "build_year": "bouwjaar",
+    "build_year_start": "bouwjaar",
+    "founded_year": "oprichtingsjaar",
+    "architect": "architect",
 }
 
 
@@ -47,12 +55,15 @@ def _build_question(poi: POI) -> Question:
                 type=QuestionType.DATA_BOUND,
                 prompt=template.format(name=poi.name),
                 answer=fact.value,
-                hint=f"It relates to {fact.key.replace('_', ' ')}.",
+                hint=(
+                    f"Tip: het gaat over de "
+                    f"{_HINT_LABELS.get(fact.key, fact.key.replace('_', ' '))}."
+                ),
             )
     # No data-bound fact available → open reflection (never gates on correctness).
     return Question(
         type=QuestionType.OPEN_REFLECTION,
-        prompt=f"Take a look around {poi.name}. What do you think happened here in the past?",
+        prompt=f"Kijk eens rond bij {poi.name}. Wat denk je dat hier vroeger is gebeurd?",
     )
 
 

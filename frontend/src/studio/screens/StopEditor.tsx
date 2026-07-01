@@ -6,7 +6,6 @@ import { SourceBadge } from "../../design-system/primitives/SourceBadge";
 import { Button } from "../../design-system/primitives/Button";
 import { PhoneFrame } from "../../design-system/primitives/PhoneFrame";
 import { MapCanvas } from "../../design-system/primitives/MapCanvas";
-import { MOCK_STOP } from "../mock/stop";
 import { useDraft } from "../draftStore";
 
 /** Pure helper: only Type A and D can gate the next stop. */
@@ -54,30 +53,23 @@ export function StopEditor() {
   const idx = activeStopOrder !== undefined ? orders.indexOf(activeStopOrder) : -1;
 
   const activeStop = draft?.stops.find((s) => s.order === activeStopOrder);
+  const hasStop = activeStop !== undefined;
 
-  // No-active-stop hint: when draft exists but activeStop is not found, show hint.
-  const showNoStopHint = draft !== undefined && idx === -1;
-
-  // For the MOCK_STOP fallback (no draft case), use MOCK_STOP data.
-  const activePoi = activeStop?.poi ?? MOCK_STOP.poi;
-  const sourceStory = activeStop ? (activeStop.story ?? "") : MOCK_STOP.story;
-  const sourceQuestion = activeStop
-    ? (activeStop.question ?? { type: "A" as QuestionType, prompt: "", answer: "", hint: "", gates: true })
-    : MOCK_STOP.question;
-
-  // Use MOCK_STOP for the stop order display when no active stop
-  const stop = MOCK_STOP;
+  // Derive from activeStop only; these are only used inside the hasStop branch.
+  const activePoi = activeStop?.poi;
+  const sourceStory = activeStop?.story ?? "";
+  const sourceQuestion = activeStop?.question ?? { type: "A" as QuestionType, prompt: "", answer: "", hint: "", gates: true };
 
   // Feiten: track which facts are included (all on by default).
   // Seed from activePoi so switching to a real POI with different fact keys
   // starts with all checkboxes checked rather than all unchecked.
   const [includedFacts, setIncludedFacts] = useState<Record<string, boolean>>(
-    Object.fromEntries(activePoi.facts.map((f) => [f.key, true]))
+    Object.fromEntries((activePoi?.facts ?? []).map((f) => [f.key, true]))
   );
 
   useEffect(() => {
-    setIncludedFacts(Object.fromEntries(activePoi.facts.map((f) => [f.key, true])));
-  }, [activePoi.id]); // eslint-disable-line react-hooks/exhaustive-deps
+    setIncludedFacts(Object.fromEntries((activePoi?.facts ?? []).map((f) => [f.key, true])));
+  }, [activePoi?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Verhaal state
   const [story, setStory] = useState(sourceStory);
@@ -100,11 +92,11 @@ export function StopEditor() {
     setHint(sourceQuestion.hint ?? "");
     setQuestionType(sourceQuestion.type as QuestionType);
     setGatesNext(Boolean(sourceQuestion.gates) && canGate(sourceQuestion.type as QuestionType));
-  }, [activeStop?.order, activePoi.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [activeStop?.order, activePoi?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleRegenerate() {
     if (activeStopOrder === undefined) return;
-    const factKeys = activePoi.facts.filter((f) => includedFacts[f.key] ?? true).map((f) => f.key);
+    const factKeys = (activePoi?.facts ?? []).filter((f) => includedFacts[f.key] ?? true).map((f) => f.key);
     setRegenError(false);
     setRegenerating(true);
     try {
@@ -264,17 +256,20 @@ export function StopEditor() {
           </div>
 
           {/* POI info */}
-          <div>
-            <div style={{ font: "400 22px/1.1 var(--tq-serif)", color: "#283a5e" }}>{activePoi.name}</div>
-            <div style={{ font: "500 12px/1.4 var(--tq-sans)", color: "#8a7f6d", marginTop: 7 }}>
-              Grote Markt 22, Haarlem
+          {hasStop && (
+            <div>
+              <div style={{ font: "400 22px/1.1 var(--tq-serif)", color: "#283a5e" }}>{activePoi!.name}</div>
+              <div style={{ font: "500 12px/1.4 var(--tq-sans)", color: "#8a7f6d", marginTop: 7 }}>
+                {draft?.city}
+              </div>
+              <div style={{ font: "500 11px/1 var(--tq-mono)", color: "#a99e88", marginTop: 6 }}>
+                {activeStop!.poi.location.lat.toFixed(4)}° N, {activeStop!.poi.location.lon.toFixed(4)}° O
+              </div>
             </div>
-            <div style={{ font: "500 11px/1 var(--tq-mono)", color: "#a99e88", marginTop: 6 }}>
-              {stop.poi.location.lat.toFixed(4)}° N, {stop.poi.location.lon.toFixed(4)}° O
-            </div>
-          </div>
+          )}
 
           {/* Status */}
+          {hasStop && (
           <div
             style={{
               borderTop: "1px solid #e6dcc6",
@@ -289,7 +284,7 @@ export function StopEditor() {
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#6f8a4f" strokeWidth="2.4">
                 <path d="M5 12l4 4 10-10" />
               </svg>
-              Feiten gegrond ({activePoi.facts.length} bronnen)
+              Feiten gegrond ({activePoi!.facts.length} bronnen)
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8, font: "600 12px/1 var(--tq-sans)", color: "#6f8a4f" }}>
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#6f8a4f" strokeWidth="2.4">
@@ -298,6 +293,7 @@ export function StopEditor() {
               Opdracht {canGate(questionType) ? "kan gaten" : "gaten uit"} (Type {questionType})
             </div>
           </div>
+          )}
         </div>
 
         {/* ── Center editor ── */}
@@ -312,7 +308,7 @@ export function StopEditor() {
             background: "#fdfbf6",
           }}
         >
-          {showNoStopHint ? (
+          {!hasStop ? (
             <div
               style={{
                 display: "flex",
@@ -359,8 +355,8 @@ export function StopEditor() {
                   </span>
                 </div>
                 <div style={{ padding: "8px 17px 14px" }}>
-                  {activePoi.facts.map((fact, i) => {
-                    const isLast = i === activePoi.facts.length - 1;
+                  {activePoi!.facts.map((fact, i) => {
+                    const isLast = i === activePoi!.facts.length - 1;
                     // Default to true for any fact key not yet in the map (e.g. during
                     // the brief window before the useEffect re-seeds from the new POI).
                     const included = includedFacts[fact.key] ?? true;
@@ -527,7 +523,7 @@ export function StopEditor() {
                       borderBottom: "1px solid #f0e6d4",
                     }}
                   >
-                    Genereren mislukt — probeer opnieuw
+                    Genereren mislukt of duurde te lang — probeer opnieuw.
                   </div>
                 )}
                 <div style={{ padding: "16px 18px" }}>
@@ -794,6 +790,7 @@ export function StopEditor() {
 
           <PhoneFrame>
             <div style={{ padding: "14px 15px", display: "flex", flexDirection: "column", gap: 10 }}>
+              {hasStop && (
               <div>
                 <div
                   style={{
@@ -802,7 +799,7 @@ export function StopEditor() {
                     letterSpacing: 1.5,
                   }}
                 >
-                  STOP {stop.order} · JE BENT ER
+                  STOP {activeStop!.order} · JE BENT ER
                 </div>
                 <div
                   style={{
@@ -811,9 +808,10 @@ export function StopEditor() {
                     marginTop: 5,
                   }}
                 >
-                  {activePoi.name}
+                  {activePoi!.name}
                 </div>
               </div>
+              )}
               <p
                 style={{
                   font: "400 11.5px/1.55 var(--tq-sans)",

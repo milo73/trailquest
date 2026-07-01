@@ -32,13 +32,13 @@ from app.config import settings
 from app.models.schemas import Fact, Theme
 
 _SYSTEM_PROMPT = (
-    "You are a local guide writing a short, vivid stop description for a walking "
-    "scavenger hunt. You will be given a place name, a theme, a list of verified "
-    "facts, and optionally some background to draw on. For any verifiable detail "
-    "(dates, numbers, names) use ONLY the verified facts — invent nothing and "
-    "leave out anything not given. You may paraphrase the background for colour, "
-    "but never copy it verbatim and never treat it as a source of new facts. Keep "
-    "it to 2-3 sentences and match the requested theme's tone."
+    "Je bent een lokale gids die een korte, levendige stopbeschrijving schrijft voor een "
+    "wandelspeurtocht. Je krijgt een plaatsnaam, een thema, een lijst geverifieerde feiten en "
+    "eventueel wat achtergrond. Gebruik voor elk verifieerbaar detail (data, getallen, namen) "
+    "UITSLUITEND de geverifieerde feiten — verzin niets en laat weg wat niet gegeven is. Je mag "
+    "de achtergrond parafraseren voor kleur, maar nooit letterlijk overnemen en nooit als bron "
+    "van nieuwe feiten gebruiken. Houd het op 2-3 zinnen en sluit aan bij de toon van het thema. "
+    "Schrijf in het Nederlands."
 )
 
 
@@ -47,17 +47,17 @@ def _build_prompt(
 ) -> str:
     fact_lines = "\n".join(f"- {f.key.replace('_', ' ')}: {f.value}" for f in facts)
     prompt = (
-        f"Place: {poi_name}\n"
-        f"Theme: {theme.value}\n"
-        f"Verified facts (use only these for verifiable claims):\n{fact_lines}\n"
+        f"Plaats: {poi_name}\n"
+        f"Thema: {theme.value}\n"
+        f"Geverifieerde feiten (gebruik alleen deze voor verifieerbare claims):\n{fact_lines}\n"
     )
     if background:
         prompt += (
-            f"\nBackground to paraphrase (do not copy, do not extract new facts):\n{background}\n"
+            f"\nAchtergrond om te parafraseren (niet kopiëren, geen nieuwe feiten):\n{background}\n"
         )
     if tone:
-        prompt += f"\nTone: write in a {tone} tone.\n"
-    return prompt + "\nWrite the stop description now."
+        prompt += f"\nToon: schrijf in een {tone} toon.\n"
+    return prompt + "\nSchrijf nu de stopbeschrijving."
 
 
 class LLMProvider(ABC):
@@ -78,7 +78,7 @@ class LLMProvider(ABC):
         but is never a source of verifiable facts (PRD §8.1).
         """
         if not facts and not background:
-            return f"{poi_name} is part of your trail."
+            return f"{poi_name} is onderdeel van je speurtocht."
         prompt = _build_prompt(poi_name, theme, facts, background, tone)
         return self.complete(system=_SYSTEM_PROMPT, prompt=prompt).strip()
 
@@ -104,7 +104,7 @@ class StubProvider(LLMProvider):
         tone: str | None = None,
     ) -> str:
         if not facts:
-            return f"{poi_name} is part of your trail."
+            return f"{poi_name} is onderdeel van je speurtocht."
         rendered = "; ".join(f"{f.key.replace('_', ' ')}: {f.value}" for f in facts)
         return f"{poi_name} — {rendered}."
 
