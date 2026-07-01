@@ -160,6 +160,12 @@ The creator studio now manages real draft trails backed by the FastAPI backend:
 - **Live distance meter** — after every stop addition, removal, or reorder the editor calls `POST /routes/measure` and updates the km / min display. Distance is a walking-network estimate (haversine if OSRM is not configured).
 - **Degraded offline state** — without the backend running, the studio dashboard and route editor show empty or error states for drafts (they degrade gracefully, they do not crash). The Stop editor and Validation screens remain fully functional on local state.
 
+### Stop editor — recent fixes (branch `feat/stop-editor-bugfixes`)
+
+- **Dutch content** — the LLM system prompt (`backend/app/services/llm/provider.py`) instructs the model to write in Dutch. Generated stories and questions are now consistently in Dutch.
+- **Active-stop requirement** — the Stop editor (`StopEditor.tsx`) now requires an active stop to be selected. When no stop is selected it shows "Geen stop geselecteerd — kies een stop in de route-editor" instead of rendering a placeholder stop. When a stop is selected it shows that stop's real coordinates (from `activeStop.poi.location`) and the draft city.
+- **"Regenereer" timeout** — the generate call (`POST /drafts/{id}/stops/{order}/generate`) now times out after 90 s via `apiFetch`'s `timeoutMs` option (`src/api/drafts.ts`). On timeout the editor shows an inline error ("Genereren mislukt of duurde te lang — probeer opnieuw."). Set `TRAILQUEST_LLM_PROVIDER=stub` for fast local generation instead of the slow `claude_cli`.
+
 ### Studio editor improvements
 
 The route and stop editors have been extended with the following capabilities:
