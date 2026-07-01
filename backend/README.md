@@ -115,6 +115,8 @@ mypy app                        # type-check
 | `PUT` | `/drafts/{id}/stops/{order}` | Save a stop's story and question; returns 422 if the question is a gating type (A or D) with no stored answer |
 | `POST` | `/drafts/{id}/stops` | Add a custom (non-catalog) factless stop to a draft; body: `name` (string), optional `lat`/`lon` (floats, default to the draft start if omitted) |
 | `POST` | `/drafts/{id}/stops/{order}/generate` | RAG-generate a grounded story and candidate question from the selected facts; body: `fact_keys` (list of fact key strings to ground the generation) and `tone` (optional string, e.g. `"speels"`) |
+| `GET` | `/drafts/{id}/validation` | Pre-publish validation report: per-stop grounding checks, blocking/warning counts, and `can_publish` (true when `blocking == 0`) |
+| `POST` | `/drafts/{id}/publish` | Re-validates the draft; returns **409** if `blocking > 0`, otherwise sets `status=review` and returns the updated draft |
 
 ## Status
 

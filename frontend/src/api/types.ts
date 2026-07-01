@@ -107,3 +107,27 @@ export interface CustomStopRequest {
   lat?: number;
   lon?: number;
 }
+
+export type CheckStatus = "ok" | "warning" | "blocking";
+
+export interface StopGrounding {
+  order: number;
+  name: string;
+  grounded: boolean;
+  sources: string;
+}
+
+export interface ValidationCheck {
+  id: string;
+  label: string;
+  detail: string;
+  status: CheckStatus;
+}
+
+export interface ValidationResult {
+  checks: ValidationCheck[];
+  per_stop: StopGrounding[];
+  blocking: number;
+  warnings: number;
+  can_publish: boolean;
+}

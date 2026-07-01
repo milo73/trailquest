@@ -146,6 +146,21 @@ export function RouteEditor() {
           >
             Voorvertoning
           </button>
+          <button
+            onClick={() => navigate("/studio/validate")}
+            style={{
+              height: 40,
+              padding: "0 16px",
+              borderRadius: 10,
+              border: "1px solid #cbbfa6",
+              background: "#fff",
+              font: "600 13px/1 var(--tq-sans)",
+              color: "#283a5e",
+              cursor: "pointer",
+            }}
+          >
+            Publiceren
+          </button>
           <Button
             variant="primary"
             style={{ height: 40, fontSize: 13, borderRadius: 10 }}

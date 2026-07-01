@@ -7,11 +7,13 @@ from fastapi import APIRouter, HTTPException
 from app.models.schemas import (
     CustomStopRequest,
     DraftCreate,
+    DraftStatus,
     DraftTrail,
     DraftUpdate,
     StopContentUpdate,
     StopGenerateRequest,
     StopGenerateResult,
+    ValidationResult,
 )
 from app.services import draft_service
 
@@ -71,3 +73,27 @@ def generate_stop_content(
         raise HTTPException(status_code=404, detail="Draft or stop not found")
     story, question = result
     return StopGenerateResult(story=story, question=question)
+
+
+@router.get("/{draft_id}/validation", response_model=ValidationResult)
+def get_validation(draft_id: str) -> ValidationResult:
+    draft = draft_service.get(draft_id)
+    if draft is None:
+        raise HTTPException(status_code=404, detail="Draft not found")
+    return draft_service.validate(draft)
+
+
+@router.post("/{draft_id}/publish", response_model=DraftTrail)
+def publish_draft(draft_id: str) -> DraftTrail:
+    draft = draft_service.get(draft_id)
+    if draft is None:
+        raise HTTPException(status_code=404, detail="Draft not found")
+    report = draft_service.validate(draft)
+    if not report.can_publish:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Kan niet publiceren: {report.blocking} blokkerende issue(s)",
+        )
+    updated = draft_service.update(draft_id, DraftUpdate(status=DraftStatus.REVIEW))
+    assert updated is not None  # draft existed above
+    return updated

@@ -2,7 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { fireEvent, waitFor } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { DraftProvider, useDraft } from "../draftStore";
 import { RouteEditor } from "./RouteEditor";
 import type { DraftTrail, POI } from "../../api/types";
@@ -104,4 +104,22 @@ test("editing the route title and blurring renames the draft", async () => {
     expect(put).toBeTruthy();
     expect(JSON.parse(put![1].body)).toEqual({ title: "Mijn route" });
   });
+});
+
+test("the Publiceren button navigates to /studio/validate", async () => {
+  const seeded = draft([]);
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(seeded), { status: 201 })));
+  render(
+    <MemoryRouter initialEntries={["/studio/route"]}>
+      <DraftProvider>
+        <Routes>
+          <Route path="/studio/route" element={<Harness seed={seeded} />} />
+          <Route path="/studio/validate" element={<div>VALIDATIE PAGINA</div>} />
+        </Routes>
+      </DraftProvider>
+    </MemoryRouter>,
+  );
+  await userEvent.click(screen.getByText("seed"));
+  await userEvent.click(await screen.findByRole("button", { name: /^Publiceren$/i }));
+  expect(await screen.findByText("VALIDATIE PAGINA")).toBeInTheDocument();
 });
