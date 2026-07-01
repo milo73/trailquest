@@ -30,7 +30,7 @@ export const generateStopContent = (draftId: string, order: number, body: StopGe
   apiFetch<StopGenerateResult>(`/drafts/${draftId}/stops/${order}/generate`, {
     method: "POST",
     body: JSON.stringify(body),
-  });
+  }, { timeoutMs: 90000 });
 
 export const createCustomStop = (draftId: string, body: CustomStopRequest) =>
   apiFetch<DraftTrail>(`/drafts/${draftId}/stops`, { method: "POST", body: JSON.stringify(body) });

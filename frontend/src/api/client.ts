@@ -7,11 +7,26 @@ export class ApiError extends Error {
   }
 }
 
-export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
-    headers: { "Content-Type": "application/json" },
-    ...init,
-  });
+export async function apiFetch<T>(
+  path: string,
+  init?: RequestInit,
+  opts?: { timeoutMs?: number },
+): Promise<T> {
+  const controller = opts?.timeoutMs != null ? new AbortController() : undefined;
+  const timer = controller ? setTimeout(() => controller.abort(), opts!.timeoutMs) : undefined;
+  const fetchInit: RequestInit = { headers: { "Content-Type": "application/json" }, ...init };
+  if (controller) fetchInit.signal = controller.signal;
+
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}${path}`, fetchInit);
+  } catch (err) {
+    if (controller?.signal.aborted) throw new ApiError(408, "Verzoek duurde te lang");
+    throw err;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+
   if (!res.ok) {
     let detail = res.statusText;
     try {
