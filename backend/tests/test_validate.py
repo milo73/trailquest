@@ -13,20 +13,35 @@ from app.services import draft_service
 
 
 def _fact() -> Fact:
-    return Fact(key="height_m", value="78", source=Source(name="Wikidata", license=SourceLicense.CC0, reference="q1"))
+    return Fact(
+        key="height_m",
+        value="78",
+        source=Source(name="Wikidata", license=SourceLicense.CC0, reference="q1"),
+    )
 
 
 def _stop(order: int, *, facts: bool = True, content: bool = True) -> DraftStop:
-    poi = POI(id=f"p{order}", name=f"Stop {order}", location=GeoPoint(lat=52.38, lon=4.63), facts=[_fact()] if facts else [])
+    poi = POI(
+        id=f"p{order}",
+        name=f"Stop {order}",
+        location=GeoPoint(lat=52.38, lon=4.63),
+        facts=[_fact()] if facts else [],
+    )
     q = Question(type=QuestionType.OPEN_REFLECTION, prompt="?") if content else None
     return DraftStop(order=order, poi=poi, story="Een verhaal." if content else None, question=q)
 
 
 def _draft(stops, *, requested=5.0, actual=5.0) -> DraftTrail:
     return DraftTrail(
-        id="d1", title="t", city="Haarlem", theme="historical",
-        start=GeoPoint(lat=52.38, lon=4.63), requested_distance_km=requested,
-        actual_distance_km=actual, estimated_duration_min=60, stops=stops,
+        id="d1",
+        title="t",
+        city="Haarlem",
+        theme="historical",
+        start=GeoPoint(lat=52.38, lon=4.63),
+        requested_distance_km=requested,
+        actual_distance_km=actual,
+        estimated_duration_min=60,
+        stops=stops,
     )
 
 
