@@ -1,10 +1,53 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { StudioChrome } from "../StudioChrome";
-import { VALIDATION_REPORT } from "../mock/validation";
+import { useDraft } from "../draftStore";
+import { getValidation, publishDraft } from "../../api/drafts";
+import type { ValidationResult } from "../../api/types";
 
 export function Validation() {
-  const report = VALIDATION_REPORT;
+  const { draft, loadDraft } = useDraft();
+  const navigate = useNavigate();
+  const [report, setReport] = useState<ValidationResult | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [published, setPublished] = useState(false);
+  const [publishError, setPublishError] = useState<string | null>(null);
+
+  // Mount-load: restore draft from localStorage on deep-link / reload
+  useEffect(() => {
+    if (!draft) {
+      const savedId = localStorage.getItem("tq.studio.draft");
+      if (savedId) {
+        loadDraft(savedId);
+      } else {
+        // No draft to load — stop showing the loading state
+        setLoading(false);
+      }
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fetch the report when a draft is available
+  useEffect(() => {
+    if (!draft) return;
+    setLoading(true);
+    setLoadError(false);
+    getValidation(draft.id)
+      .then((r) => setReport(r))
+      .catch(() => setLoadError(true))
+      .finally(() => setLoading(false));
+  }, [draft?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function handlePublish() {
+    if (!draft || !report || report.blocking > 0) return;
+    setPublishError(null);
+    try {
+      await publishDraft(draft.id);
+      setPublished(true);
+    } catch {
+      setPublishError("Kan nog niet publiceren — los de blokkerende issues op.");
+    }
+  }
 
   return (
     <StudioChrome breadcrumb="publiceren">
@@ -48,154 +91,201 @@ export function Validation() {
             de tocht live gaat.
           </div>
 
+          {/* Loading / error / no draft states */}
+          {!loading && !draft && (
+            <div style={{ marginTop: 24, font: "500 14px/1.5 var(--tq-sans)", color: "#8a7f6d" }}>
+              Geen tocht geselecteerd — open er een via het dashboard
+            </div>
+          )}
+          {loading && (
+            <div style={{ marginTop: 24, font: "500 14px/1.5 var(--tq-sans)", color: "#8a7f6d" }}>
+              Rapport laden…
+            </div>
+          )}
+          {loadError && (
+            <div style={{ marginTop: 24, font: "500 14px/1.5 var(--tq-sans)", color: "#b5453a" }}>
+              Kon het validatierapport niet laden
+            </div>
+          )}
+
           {/* Checks list */}
-          <div
-            data-testid="checks-list"
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: 11,
-              marginTop: 24,
-            }}
-          >
-            {report.checks.map((check) => {
-              const isWarning = check.status === "warning";
-              return (
-                <div
-                  key={check.id}
-                  style={{
-                    display: "flex",
-                    alignItems: isWarning ? "flex-start" : "center",
-                    gap: 14,
-                    background: isWarning ? "#fdf6e8" : "#fff",
-                    border: isWarning ? "1.5px solid #e6cf9a" : "1px solid #e6dcc6",
-                    borderRadius: 12,
-                    padding: "15px 17px",
-                  }}
-                >
-                  {/* Icon */}
-                  <span
+          {report && (
+            <div
+              data-testid="checks-list"
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 11,
+                marginTop: 24,
+              }}
+            >
+              {report.checks.map((check) => {
+                const isBlocking = check.status === "blocking";
+                const isWarning = check.status === "warning";
+                const isOk = check.status === "ok";
+
+                // Colour tokens per status
+                const bgColor = isBlocking ? "#fdf0ee" : isWarning ? "#fdf6e8" : "#fff";
+                const borderColor = isBlocking ? "1.5px solid #d9867f" : isWarning ? "1.5px solid #e6cf9a" : "1px solid #e6dcc6";
+                const iconBg = isBlocking ? "#f5ccc8" : isWarning ? "#f3e3bd" : "#e7eed7";
+                const iconStroke = isBlocking ? "#b5453a" : isWarning ? "#c5912f" : "#6f8a4f";
+                const labelColor = isBlocking ? "#7a1f1a" : isWarning ? "#8a7039" : "#211f1b";
+                const detailColor = isBlocking ? "#b5453a" : isWarning ? "#a3781f" : "#8a7f6d";
+
+                return (
+                  <div
+                    key={check.id}
                     style={{
-                      width: 34,
-                      height: 34,
-                      borderRadius: "50%",
-                      background: isWarning ? "#f3e3bd" : "#e7eed7",
                       display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      flexShrink: 0,
+                      alignItems: isOk ? "center" : "flex-start",
+                      gap: 14,
+                      background: bgColor,
+                      border: borderColor,
+                      borderRadius: 12,
+                      padding: "15px 17px",
                     }}
                   >
-                    {isWarning ? (
-                      <svg
-                        width="18"
-                        height="18"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="#c5912f"
-                        strokeWidth="2.4"
-                      >
-                        <path d="M12 3 22 20H2Z" />
-                        <line x1="12" y1="10" x2="12" y2="14.5" />
-                        <circle cx="12" cy="17.5" r="0.6" fill="#c5912f" />
-                      </svg>
-                    ) : (
-                      <svg
-                        width="18"
-                        height="18"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="#6f8a4f"
-                        strokeWidth="2.6"
-                      >
-                        <path d="M5 12l4 4 10-10" />
-                      </svg>
-                    )}
-                  </span>
-
-                  {/* Text */}
-                  <div style={{ flex: 1 }}>
-                    <div
-                      style={{
-                        font: "700 14px/1.2 var(--tq-sans)",
-                        color: isWarning ? "#8a7039" : "#211f1b",
-                      }}
-                    >
-                      {check.label}
-                    </div>
-                    <div
-                      style={{
-                        font: "500 12px/1.4 var(--tq-sans)",
-                        color: isWarning ? "#a3781f" : "#8a7f6d",
-                        marginTop: isWarning ? 4 : 3,
-                      }}
-                    >
-                      {check.detail}
-                    </div>
-
-                    {/* Warning resolution buttons */}
-                    {isWarning && (
-                      <div style={{ display: "flex", gap: 9, marginTop: 13 }}>
-                        <button
-                          style={{
-                            height: 36,
-                            padding: "0 14px",
-                            borderRadius: 9,
-                            border: "none",
-                            background: "#283a5e",
-                            color: "#fff",
-                            font: "600 12px/1 var(--tq-sans)",
-                            cursor: "pointer",
-                          }}
-                        >
-                          Stop overslaan
-                        </button>
-                        <button
-                          style={{
-                            height: 36,
-                            padding: "0 14px",
-                            borderRadius: 9,
-                            border: "1px solid #d9c08a",
-                            background: "#fff",
-                            color: "#8a7039",
-                            font: "600 12px/1 var(--tq-sans)",
-                            cursor: "pointer",
-                          }}
-                        >
-                          Niet-feitelijk verhaal
-                        </button>
-                        <button
-                          style={{
-                            height: 36,
-                            padding: "0 14px",
-                            borderRadius: 9,
-                            border: "1px solid #e0d5bf",
-                            background: "transparent",
-                            color: "#8a7f6d",
-                            font: "600 12px/1 var(--tq-sans)",
-                            cursor: "pointer",
-                          }}
-                        >
-                          Toch behouden
-                        </button>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Meta (ok rows only) */}
-                  {!isWarning && (
+                    {/* Icon */}
                     <span
                       style={{
-                        font: "600 12px/1 var(--tq-mono)",
-                        color: "#3a5a2f",
+                        width: 34,
+                        height: 34,
+                        borderRadius: "50%",
+                        background: iconBg,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexShrink: 0,
                       }}
                     >
-                      {check.meta}
+                      {isOk ? (
+                        <svg
+                          width="18"
+                          height="18"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke={iconStroke}
+                          strokeWidth="2.6"
+                        >
+                          <path d="M5 12l4 4 10-10" />
+                        </svg>
+                      ) : (
+                        <svg
+                          width="18"
+                          height="18"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke={iconStroke}
+                          strokeWidth="2.4"
+                        >
+                          <path d="M12 3 22 20H2Z" />
+                          <line x1="12" y1="10" x2="12" y2="14.5" />
+                          <circle cx="12" cy="17.5" r="0.6" fill={iconStroke} />
+                        </svg>
+                      )}
                     </span>
-                  )}
-                </div>
-              );
-            })}
+
+                    {/* Text */}
+                    <div style={{ flex: 1 }}>
+                      <div
+                        style={{
+                          font: "700 14px/1.2 var(--tq-sans)",
+                          color: labelColor,
+                        }}
+                      >
+                        {check.label}
+                      </div>
+                      <div
+                        style={{
+                          font: "500 12px/1.4 var(--tq-sans)",
+                          color: detailColor,
+                          marginTop: isOk ? 3 : 4,
+                        }}
+                      >
+                        {check.detail}
+                      </div>
+
+                      {/* Warning/blocking resolution buttons */}
+                      {!isOk && (
+                        <div style={{ display: "flex", gap: 9, marginTop: 13 }}>
+                          <button
+                            style={{
+                              height: 36,
+                              padding: "0 14px",
+                              borderRadius: 9,
+                              border: "none",
+                              background: "#283a5e",
+                              color: "#fff",
+                              font: "600 12px/1 var(--tq-sans)",
+                              cursor: "pointer",
+                            }}
+                          >
+                            Stop overslaan
+                          </button>
+                          <button
+                            style={{
+                              height: 36,
+                              padding: "0 14px",
+                              borderRadius: 9,
+                              border: "1px solid #d9c08a",
+                              background: "#fff",
+                              color: "#8a7039",
+                              font: "600 12px/1 var(--tq-sans)",
+                              cursor: "pointer",
+                            }}
+                          >
+                            Niet-feitelijk verhaal
+                          </button>
+                          <button
+                            style={{
+                              height: 36,
+                              padding: "0 14px",
+                              borderRadius: 9,
+                              border: "1px solid #e0d5bf",
+                              background: "transparent",
+                              color: "#8a7f6d",
+                              font: "600 12px/1 var(--tq-sans)",
+                              cursor: "pointer",
+                            }}
+                          >
+                            Toch behouden
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Meta (ok rows only) */}
+                    {isOk && (
+                      <span
+                        style={{
+                          font: "600 12px/1 var(--tq-mono)",
+                          color: "#3a5a2f",
+                        }}
+                      >
+                        {check.detail}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Back navigation */}
+          <div style={{ marginTop: 20 }}>
+            <button
+              onClick={() => navigate("/studio/route")}
+              style={{
+                background: "none",
+                border: "none",
+                color: "#8a7f6d",
+                font: "500 13px/1 var(--tq-sans)",
+                cursor: "pointer",
+                padding: 0,
+              }}
+            >
+              ← Terug naar route-editor
+            </button>
           </div>
         </div>
 
@@ -224,6 +314,7 @@ export function Validation() {
           {/* Blocking / warnings counts */}
           <div style={{ display: "flex", gap: 12, marginTop: 18 }}>
             <div
+              data-testid="blocking-count-card"
               style={{
                 flex: 1,
                 background: "rgba(255,255,255,.07)",
@@ -234,10 +325,10 @@ export function Validation() {
               <div
                 style={{
                   font: "400 28px/1 var(--tq-serif)",
-                  color: "#9fb87f",
+                  color: "#e8908a",
                 }}
               >
-                {report.blocking}
+                {report?.blocking ?? "–"}
               </div>
               <div
                 style={{
@@ -264,7 +355,7 @@ export function Validation() {
                   color: "#e6cf9a",
                 }}
               >
-                {report.warnings}
+                {report?.warnings ?? "–"}
               </div>
               <div
                 style={{
@@ -297,7 +388,7 @@ export function Validation() {
               marginTop: 14,
             }}
           >
-            {report.perStop.map((stop) => (
+            {report?.per_stop.map((stop) => (
               <div
                 key={stop.order}
                 style={{
@@ -384,23 +475,24 @@ export function Validation() {
                 </svg>
                 Verzonden naar moderatie
               </div>
-            ) : (
+            ) : !loading && (
               <button
-                onClick={() => setPublished(true)}
+                onClick={handlePublish}
+                disabled={!report || report.blocking > 0}
                 style={{
                   width: "100%",
                   height: 52,
                   border: "none",
                   borderRadius: 14,
-                  background: "#b5453a",
+                  background: !report || report.blocking > 0 ? "#7a8aa6" : "#b5453a",
                   color: "#fff",
                   font: "700 15px/1 var(--tq-sans)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                   gap: 9,
-                  cursor: "pointer",
-                  boxShadow: "0 12px 24px -12px rgba(0,0,0,.5)",
+                  cursor: !report || report.blocking > 0 ? "not-allowed" : "pointer",
+                  boxShadow: !report || report.blocking > 0 ? "none" : "0 12px 24px -12px rgba(0,0,0,.5)",
                 }}
               >
                 Publiceren naar moderatie
@@ -415,6 +507,17 @@ export function Validation() {
                   <path d="M5 12h14M13 6l6 6-6 6" />
                 </svg>
               </button>
+            )}
+            {publishError && (
+              <div
+                style={{
+                  font: "500 12px/1.4 var(--tq-sans)",
+                  color: "#e8908a",
+                  textAlign: "center",
+                }}
+              >
+                {publishError}
+              </div>
             )}
             <div
               style={{
