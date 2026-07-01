@@ -185,7 +185,7 @@ The route and stop editors have been extended with the following capabilities:
 
 ### Studio — validation and publish
 
-The Validation screen is now backed by the FastAPI backend. Clicking "Publiceren" in the Route editor navigates to `/studio/validation`, which calls `GET /drafts/{id}/validation` and displays a server-computed report.
+The Validation screen is now backed by the FastAPI backend. Clicking "Publiceren" in the Route editor navigates to `/studio/validate`, which calls `GET /drafts/{id}/validation` and displays a server-computed report.
 
 **Blocking rules** (a draft cannot be published while any of these apply):
 

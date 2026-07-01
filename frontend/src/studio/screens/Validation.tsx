@@ -204,54 +204,6 @@ export function Validation() {
                       >
                         {check.detail}
                       </div>
-
-                      {/* Warning/blocking resolution buttons */}
-                      {!isOk && (
-                        <div style={{ display: "flex", gap: 9, marginTop: 13 }}>
-                          <button
-                            style={{
-                              height: 36,
-                              padding: "0 14px",
-                              borderRadius: 9,
-                              border: "none",
-                              background: "#283a5e",
-                              color: "#fff",
-                              font: "600 12px/1 var(--tq-sans)",
-                              cursor: "pointer",
-                            }}
-                          >
-                            Stop overslaan
-                          </button>
-                          <button
-                            style={{
-                              height: 36,
-                              padding: "0 14px",
-                              borderRadius: 9,
-                              border: "1px solid #d9c08a",
-                              background: "#fff",
-                              color: "#8a7039",
-                              font: "600 12px/1 var(--tq-sans)",
-                              cursor: "pointer",
-                            }}
-                          >
-                            Niet-feitelijk verhaal
-                          </button>
-                          <button
-                            style={{
-                              height: 36,
-                              padding: "0 14px",
-                              borderRadius: 9,
-                              border: "1px solid #e0d5bf",
-                              background: "transparent",
-                              color: "#8a7f6d",
-                              font: "600 12px/1 var(--tq-sans)",
-                              cursor: "pointer",
-                            }}
-                          >
-                            Toch behouden
-                          </button>
-                        </div>
-                      )}
                     </div>
 
                     {/* Status label */}
