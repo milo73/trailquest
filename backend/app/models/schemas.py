@@ -10,8 +10,9 @@ progress to the next stop.
 from __future__ import annotations
 
 from enum import StrEnum
+from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class Theme(StrEnum):
@@ -132,12 +133,36 @@ class POI(BaseModel):
 
 
 class Stop(BaseModel):
-    """One stop on a trail: a POI plus its generated story and a question."""
+    """One stop on a trail: a POI, its story, and one or more questions.
+
+    Exactly one question is the *primary* (``primary_question_index``): its type
+    decides gating (A/D gate on correctness, C gates-through, B honor). The rest
+    are bonus questions — answerable, but they never unlock the next stop.
+    """
 
     order: int
     poi: POI
     story: str  # LLM-generated narrative, grounded in poi.facts
-    question: Question
+    questions: list[Question] = Field(min_length=1)
+    primary_question_index: int
+
+    @model_validator(mode="before")
+    @classmethod
+    def _lift_legacy_question(cls, data: Any) -> Any:
+        if isinstance(data, dict) and "question" in data and "questions" not in data:
+            q = data["question"]
+            data = {k: v for k, v in data.items() if k != "question"}
+            data["questions"] = [q] if q is not None else []
+            data.setdefault("primary_question_index", 0)
+        return data
+
+    def model_post_init(self, __context: object) -> None:
+        if not 0 <= self.primary_question_index < len(self.questions):
+            raise ValueError("primary_question_index out of range")
+
+    @property
+    def primary_question(self) -> Question:
+        return self.questions[self.primary_question_index]
 
 
 class Trail(BaseModel):
@@ -172,6 +197,7 @@ class AnswerRequest(BaseModel):
     stop_order: int
     answer: str
     attempt: int = Field(ge=1)  # 1-based attempt number
+    question_index: int | None = None
 
 
 class AnswerResult(BaseModel):
@@ -190,13 +216,26 @@ class DraftStatus(StrEnum):
 
 
 class DraftStop(BaseModel):
-    """A stop on a draft trail. Unlike a player-facing ``Stop``, the generated
-    ``story``/``question`` are optional — they are authored later in the studio."""
+    """A stop on a draft trail. Unlike a player-facing ``Stop``, ``story`` and
+    ``questions`` are optional — they are authored later in the studio."""
 
     order: int
     poi: POI
     story: str | None = None
-    question: Question | None = None
+    questions: list[Question] = Field(default_factory=list)
+    primary_question_index: int | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _lift_legacy_question(cls, data: Any) -> Any:
+        if isinstance(data, dict) and "question" in data and "questions" not in data:
+            q = data["question"]
+            data = {k: v for k, v in data.items() if k != "question"}
+            data["questions"] = [q] if q is not None else []
+            if q is not None:
+                gates = q.get("gates") if isinstance(q, dict) else getattr(q, "gates", False)
+                data["primary_question_index"] = 0 if gates else None
+        return data
 
 
 class DraftTrail(BaseModel):
@@ -245,7 +284,8 @@ class RouteMeasureResult(BaseModel):
 
 class StopContentUpdate(BaseModel):
     story: str | None = None
-    question: Question | None = None
+    questions: list[Question] | None = None
+    primary_question_index: int | None = None
 
 
 class StopGenerateRequest(BaseModel):
@@ -255,7 +295,8 @@ class StopGenerateRequest(BaseModel):
 
 class StopGenerateResult(BaseModel):
     story: str
-    question: Question
+    questions: list[Question]
+    primary_question_index: int | None = None
 
 
 class CustomStopRequest(BaseModel):
