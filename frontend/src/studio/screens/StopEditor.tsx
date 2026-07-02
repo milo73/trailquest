@@ -58,7 +58,8 @@ export function StopEditor() {
   // Derive from activeStop only; these are only used inside the hasStop branch.
   const activePoi = activeStop?.poi;
   const sourceStory = activeStop?.story ?? "";
-  const sourceQuestion = activeStop?.question ?? { type: "A" as QuestionType, prompt: "", answer: "", hint: "", gates: true };
+  const primaryIndex = activeStop?.primary_question_index ?? 0;
+  const sourceQuestion = activeStop?.questions?.[primaryIndex] ?? { type: "A" as QuestionType, prompt: "", answer: "", hint: "", gates: true };
 
   // Feiten: track which facts are included (all on by default).
   // Seed from activePoi so switching to a real POI with different fact keys
@@ -101,13 +102,14 @@ export function StopEditor() {
     setRegenerating(true);
     try {
       const result = await generateStopContent(activeStopOrder, { fact_keys: factKeys, tone });
+      const primaryQuestion = result.questions[result.primary_question_index ?? 0];
       setStory(result.story);
-      setPrompt(result.question.prompt);
-      setAnswer(result.question.answer ?? "");
-      setHint(result.question.hint ?? "");
-      setQuestionType(result.question.type as QuestionType);
-      setGatesNext(Boolean(result.question.gates) && canGate(result.question.type as QuestionType));
-      await saveStopContent(activeStopOrder, { story: result.story, question: result.question });
+      setPrompt(primaryQuestion.prompt);
+      setAnswer(primaryQuestion.answer ?? "");
+      setHint(primaryQuestion.hint ?? "");
+      setQuestionType(primaryQuestion.type as QuestionType);
+      setGatesNext(Boolean(primaryQuestion.gates) && canGate(primaryQuestion.type as QuestionType));
+      await saveStopContent(activeStopOrder, { story: result.story, questions: result.questions, primary_question_index: result.primary_question_index });
     } catch {
       setRegenError(true);
     } finally {
@@ -135,7 +137,7 @@ export function StopEditor() {
     if (activeStopOrder === undefined) return;
     const q = buildQuestionWith(type, gates);
     if (q === null) return;
-    await saveStopContent(activeStopOrder, { question: q });
+    await saveStopContent(activeStopOrder, { questions: [q], primary_question_index: 0 });
   }
 
   async function saveQuestion() {

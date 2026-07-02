@@ -12,14 +12,16 @@ export function Stop() {
   const { state, recordSolve, arriveAtNextOrFinish } = useQuester();
   const trail = state.trail!;
   const stop = trail.stops.find((s) => s.order === state.currentOrder)!;
-  const { poi, story, question } = stop;
+  const { poi, story, questions } = stop;
+  const primaryIndex = stop.primary_question_index;
+  const question = questions[primaryIndex];
 
   // Distinct fact sources (by source name)
   const distinctSources = Array.from(
     new Map(poi.facts.map((f) => [f.source.name, f.source])).values()
   );
 
-  // Local state
+  // Primary question state
   const [answer, setAnswer] = useState("");
   const [attempt, setAttempt] = useState(1);
   const [usedHint, setUsedHint] = useState(false);
@@ -29,11 +31,16 @@ export function Stop() {
   const [revealedAnswer, setRevealedAnswer] = useState<string | null>(null);
   const [reportedFact, setReportedFact] = useState(false);
 
+  // Bonus question state (keyed by question index)
+  const [bonusAnswers, setBonusAnswers] = useState<Record<number, string>>({});
+  const [bonusFeedback, setBonusFeedback] = useState<Record<number, string>>({});
+
   async function handleSubmit() {
     const result = await submitAnswer(trail.id, {
       stop_order: stop.order,
       answer,
       attempt,
+      question_index: primaryIndex,
     });
 
     setFeedback(result.feedback);
@@ -54,10 +61,27 @@ export function Stop() {
     }
   }
 
+  async function handleBonusSubmit(i: number) {
+    const bonusAnswer = bonusAnswers[i] ?? "";
+    const result = await submitAnswer(trail.id, {
+      stop_order: stop.order,
+      answer: bonusAnswer,
+      attempt: 1,
+      question_index: i,
+    });
+    // Ignore result.unlocked_next — bonus never advances
+    setBonusFeedback((prev) => ({ ...prev, [i]: result.feedback }));
+  }
+
   function handleHint() {
     setUsedHint(true);
     setShowHint(true);
   }
+
+  // Non-primary questions (bonus)
+  const bonusQuestions = questions
+    .map((q, i) => ({ q, i }))
+    .filter(({ i }) => i !== primaryIndex);
 
   return (
     <PhoneFrame>
@@ -194,7 +218,7 @@ export function Stop() {
           </div>
         )}
 
-        {/* Raadsel card */}
+        {/* Raadsel card (primary gate) */}
         <div
           style={{
             background: "#faf6ec",
@@ -404,6 +428,99 @@ export function Stop() {
             </Button>
           )}
         </div>
+
+        {/* Extra vragen (bonus) */}
+        {bonusQuestions.length > 0 && (
+          <div
+            style={{
+              background: "#f7f2e8",
+              border: "1px solid #e0d5bf",
+              borderRadius: 15,
+              padding: 16,
+            }}
+          >
+            <div
+              style={{
+                font: "600 11px/1 'Spline Sans Mono'",
+                color: "#8a7f6d",
+                letterSpacing: 1,
+                marginBottom: 12,
+              }}
+            >
+              EXTRA VRAGEN
+            </div>
+            {bonusQuestions.map(({ q, i }) => (
+              <div
+                key={i}
+                style={{
+                  marginBottom: bonusQuestions[bonusQuestions.length - 1].i === i ? 0 : 14,
+                }}
+              >
+                <p
+                  style={{
+                    font: "500 14px/1.5 'DM Sans'",
+                    color: "#211f1b",
+                    margin: "0 0 10px",
+                  }}
+                >
+                  {q.prompt}
+                </p>
+                {bonusFeedback[i] && (
+                  <p
+                    style={{
+                      font: "500 13px/1.5 'DM Sans'",
+                      color: "#5a6a3f",
+                      margin: "0 0 8px",
+                      padding: "8px 10px",
+                      background: "#e7eed7",
+                      borderRadius: 8,
+                      border: "1px solid #cdd9b3",
+                    }}
+                  >
+                    {bonusFeedback[i]}
+                  </p>
+                )}
+                <div style={{ display: "flex", gap: 8 }}>
+                  <input
+                    placeholder="Jouw antwoord"
+                    value={bonusAnswers[i] ?? ""}
+                    onChange={(e) =>
+                      setBonusAnswers((prev) => ({ ...prev, [i]: e.target.value }))
+                    }
+                    style={{
+                      flex: 1,
+                      height: 42,
+                      borderRadius: 10,
+                      border: "1.5px solid #ddd2bd",
+                      background: "#fff",
+                      padding: "0 12px",
+                      font: "500 14px/1 'DM Sans'",
+                      color: "#211f1b",
+                      outline: "none",
+                    }}
+                  />
+                  <button
+                    aria-label="Controleer"
+                    onClick={() => void handleBonusSubmit(i)}
+                    style={{
+                      height: 42,
+                      padding: "0 14px",
+                      border: "none",
+                      borderRadius: 10,
+                      background: "#283a5e",
+                      color: "#fff",
+                      font: "600 13px/1 'DM Sans'",
+                      cursor: "pointer",
+                      flexShrink: 0,
+                    }}
+                  >
+                    Controleer
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Fact report link */}
         <button

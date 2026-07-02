@@ -22,7 +22,7 @@ export interface POI {
   background?: string | null;
   background_source?: Source | null;
 }
-export interface Stop { order: number; poi: POI; story: string; question: Question; }
+export interface Stop { order: number; poi: POI; story: string; questions: Question[]; primary_question_index: number; }
 export interface Trail {
   id: string;
   city: string;
@@ -36,7 +36,7 @@ export interface Trail {
 }
 
 export interface TrailRequest { start: GeoPoint; distance_km: number; theme: Theme; }
-export interface AnswerRequest { stop_order: number; answer: string; attempt: number; }
+export interface AnswerRequest { stop_order: number; answer: string; attempt: number; question_index?: number | null; }
 export interface AnswerResult {
   correct: boolean;
   unlocked_next: boolean;
@@ -50,7 +50,8 @@ export interface DraftStop {
   order: number;
   poi: POI;
   story?: string | null;
-  question?: Question | null;
+  questions: Question[];
+  primary_question_index?: number | null;
 }
 
 export interface DraftTrail {
@@ -89,7 +90,8 @@ export interface RouteMeasureResult {
 
 export interface StopContentUpdate {
   story?: string | null;
-  question?: Question | null;
+  questions?: Question[] | null;
+  primary_question_index?: number | null;
 }
 
 export interface StopGenerateRequest {
@@ -99,7 +101,8 @@ export interface StopGenerateRequest {
 
 export interface StopGenerateResult {
   story: string;
-  question: Question;
+  questions: Question[];
+  primary_question_index?: number | null;
 }
 
 export interface CustomStopRequest {

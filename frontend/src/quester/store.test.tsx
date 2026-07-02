@@ -10,8 +10,8 @@ const trail: Trail = {
   estimated_duration_min: 105, start: { lat: 52.38, lon: 4.63 },
   attributions: [],
   stops: [
-    { order: 1, poi: { id: "p1", name: "Grote Markt", location: { lat: 52.38, lon: 4.63 }, facts: [] }, story: "s", question: { type: "C", prompt: "?", gates: false } },
-    { order: 2, poi: { id: "p2", name: "Stadhuis", location: { lat: 52.38, lon: 4.63 }, facts: [] }, story: "s", question: { type: "A", prompt: "?", answer: "78", gates: true } },
+    { order: 1, poi: { id: "p1", name: "Grote Markt", location: { lat: 52.38, lon: 4.63 }, facts: [] }, story: "s", questions: [{ type: "C", prompt: "?", gates: false }], primary_question_index: 0 },
+    { order: 2, poi: { id: "p2", name: "Stadhuis", location: { lat: 52.38, lon: 4.63 }, facts: [] }, story: "s", questions: [{ type: "A", prompt: "?", answer: "78", gates: true }], primary_question_index: 0 },
   ],
 };
 

@@ -17,7 +17,7 @@ test("selecting type B disables and forces off the gate toggle", async () => {
     id: "d1", title: "t", city: "Haarlem", theme: "historical",
     start: { lat: 52.38, lon: 4.63 }, requested_distance_km: 5, actual_distance_km: 1,
     estimated_duration_min: 10,
-    stops: [{ order: 1, poi: { id: "p1", name: "Waag", location: { lat: 52.38, lon: 4.63 }, facts: [] }, story: "s", question: { type: "A", prompt: "q", answer: "a", hint: null, gates: true } }],
+    stops: [{ order: 1, poi: { id: "p1", name: "Waag", location: { lat: 52.38, lon: 4.63 }, facts: [] }, story: "s", questions: [{ type: "A", prompt: "q", answer: "a", hint: null, gates: true }], primary_question_index: 0 }],
     status: "concept", attributions: [],
   };
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(draftWithStop), { status: 201 })));
@@ -46,7 +46,7 @@ test("verhaal word count updates as you edit", async () => {
     id: "d1", title: "t", city: "Haarlem", theme: "historical",
     start: { lat: 52.38, lon: 4.63 }, requested_distance_km: 5, actual_distance_km: 1,
     estimated_duration_min: 10,
-    stops: [{ order: 1, poi: { id: "p1", name: "Waag", location: { lat: 52.38, lon: 4.63 }, facts: [] }, story: "s", question: { type: "A", prompt: "q", answer: "a", hint: null, gates: true } }],
+    stops: [{ order: 1, poi: { id: "p1", name: "Waag", location: { lat: 52.38, lon: 4.63 }, facts: [] }, story: "s", questions: [{ type: "A", prompt: "q", answer: "a", hint: null, gates: true }], primary_question_index: 0 }],
     status: "concept", attributions: [],
   };
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(draftWithStop), { status: 201 })));
@@ -99,6 +99,7 @@ test("fact checkboxes are checked by default for the active POI's facts", async 
           source: { name: "Wikidata", license: "CC0", reference: "https://www.wikidata.org/wiki/Q1234" },
         }],
       },
+      questions: [],
     }],
     status: "concept", attributions: [],
   };
@@ -143,7 +144,7 @@ test("shows the active draft stop's POI when one is selected", async () => {
     id: "d1", title: "t", city: "Haarlem", theme: "historical",
     start: { lat: 52.38, lon: 4.63 }, requested_distance_km: 5, actual_distance_km: 1,
     estimated_duration_min: 10,
-    stops: [{ order: 1, poi: { id: "p9", name: "Waag", location: { lat: 52.38, lon: 4.63 }, facts: [] } }],
+    stops: [{ order: 1, poi: { id: "p9", name: "Waag", location: { lat: 52.38, lon: 4.63 }, facts: [] }, questions: [] }],
     status: "concept", attributions: [],
   };
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(draftWithStop), { status: 201 })));
@@ -165,7 +166,7 @@ test("editing the story and blurring autosaves via PUT", async () => {
     id: "d1", title: "t", city: "Haarlem", theme: "historical",
     start: { lat: 52.38, lon: 4.63 }, requested_distance_km: 5, actual_distance_km: 1,
     estimated_duration_min: 10,
-    stops: [{ order: 1, poi: { id: "p9", name: "Waag", location: { lat: 52.38, lon: 4.63 }, facts: [] }, story: "Oud verhaal.", question: { type: "C", prompt: "Wat denk je?", gates: false } }],
+    stops: [{ order: 1, poi: { id: "p9", name: "Waag", location: { lat: 52.38, lon: 4.63 }, facts: [] }, story: "Oud verhaal.", questions: [{ type: "C", prompt: "Wat denk je?", gates: false }], primary_question_index: 0 }],
     status: "concept", attributions: [],
   };
   const fetchMock = vi
@@ -195,7 +196,7 @@ test("a Type-A question with no answer is blocked from saving", async () => {
     id: "d1", title: "t", city: "Haarlem", theme: "historical",
     start: { lat: 52.38, lon: 4.63 }, requested_distance_km: 5, actual_distance_km: 1,
     estimated_duration_min: 10,
-    stops: [{ order: 1, poi: { id: "p9", name: "Waag", location: { lat: 52.38, lon: 4.63 }, facts: [] }, story: "", question: { type: "A", prompt: "Hoe hoog?", answer: "10", hint: null, gates: true } }],
+    stops: [{ order: 1, poi: { id: "p9", name: "Waag", location: { lat: 52.38, lon: 4.63 }, facts: [] }, story: "", questions: [{ type: "A", prompt: "Hoe hoog?", answer: "10", hint: null, gates: true }], primary_question_index: 0 }],
     status: "concept", attributions: [],
   };
   const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(draftWithStop), { status: 201 }));
@@ -220,12 +221,12 @@ test("Regenereer generates from selected facts and fills the fields", async () =
     id: "d1", title: "t", city: "Haarlem", theme: "historical",
     start: { lat: 52.38, lon: 4.63 }, requested_distance_km: 5, actual_distance_km: 1,
     estimated_duration_min: 10,
-    stops: [{ order: 1, poi: { id: "p9", name: "Waag", location: { lat: 52.38, lon: 4.63 }, facts: [fact] }, story: "", question: null }],
+    stops: [{ order: 1, poi: { id: "p9", name: "Waag", location: { lat: 52.38, lon: 4.63 }, facts: [fact] }, story: "", questions: [], primary_question_index: null }],
     status: "concept", attributions: [],
   };
   const fetchMock = vi.fn((url: string, _init?: RequestInit) => {
     if (String(url).endsWith("/generate"))
-      return Promise.resolve(new Response(JSON.stringify({ story: "Gegenereerd verhaal over 1370.", question: { type: "A", prompt: "In welk jaar?", answer: "1370", hint: null, gates: true } }), { status: 200 }));
+      return Promise.resolve(new Response(JSON.stringify({ story: "Gegenereerd verhaal over 1370.", questions: [{ type: "A", prompt: "In welk jaar?", answer: "1370", hint: null, gates: true }], primary_question_index: 0 }), { status: 200 }));
     return Promise.resolve(new Response(JSON.stringify(draftWithStop), { status: 201 }));
   });
   vi.stubGlobal("fetch", fetchMock);
@@ -249,8 +250,8 @@ test("prev/next pagination changes the active stop", async () => {
     start: { lat: 52.38, lon: 4.63 }, requested_distance_km: 5, actual_distance_km: 1,
     estimated_duration_min: 10,
     stops: [
-      { order: 1, poi: { id: "p1", name: "Eerste", location: { lat: 52.38, lon: 4.63 }, facts: [] }, story: "", question: null },
-      { order: 2, poi: { id: "p2", name: "Tweede", location: { lat: 52.38, lon: 4.63 }, facts: [] }, story: "", question: null },
+      { order: 1, poi: { id: "p1", name: "Eerste", location: { lat: 52.38, lon: 4.63 }, facts: [] }, story: "", questions: [], primary_question_index: null },
+      { order: 2, poi: { id: "p2", name: "Tweede", location: { lat: 52.38, lon: 4.63 }, facts: [] }, story: "", questions: [], primary_question_index: null },
     ],
     status: "concept", attributions: [],
   };
@@ -271,7 +272,7 @@ test("a failed Regenereer shows an error message", async () => {
     id: "d1", title: "t", city: "Haarlem", theme: "historical",
     start: { lat: 52.38, lon: 4.63 }, requested_distance_km: 5, actual_distance_km: 1,
     estimated_duration_min: 10,
-    stops: [{ order: 1, poi: { id: "p1", name: "Waag", location: { lat: 52.38, lon: 4.63 }, facts: [] }, story: "", question: null }],
+    stops: [{ order: 1, poi: { id: "p1", name: "Waag", location: { lat: 52.38, lon: 4.63 }, facts: [] }, story: "", questions: [], primary_question_index: null }],
     status: "concept", attributions: [],
   };
   const fetchMock = vi.fn((url: string) =>
@@ -293,7 +294,7 @@ test("a failed Regenereer shows an error message", async () => {
 test("switching type A→C immediately saves with the NEW type, not the old one", async () => {
   // Start with a Type-A question (answer present so it's valid) and a fact so the
   // POI renders correctly. Switch to Type C via the select and assert the PUT body
-  // carries question.type === "C", not the stale "A".
+  // carries questions[0].type === "C", not the stale "A".
   const draftWithStop = {
     id: "d1", title: "t", city: "Haarlem", theme: "historical",
     start: { lat: 52.38, lon: 4.63 }, requested_distance_km: 5, actual_distance_km: 1,
@@ -311,7 +312,8 @@ test("switching type A→C immediately saves with the NEW type, not the old one"
         }],
       },
       story: "Oud gebouw.",
-      question: { type: "A", prompt: "Wanneer gebouwd?", answer: "1370", hint: null, gates: true },
+      questions: [{ type: "A", prompt: "Wanneer gebouwd?", answer: "1370", hint: null, gates: true }],
+      primary_question_index: 0,
     }],
     status: "concept", attributions: [],
   };
@@ -341,7 +343,7 @@ test("switching type A→C immediately saves with the NEW type, not the old one"
     expect(putCalls.length).toBeGreaterThan(0);
     const lastPut = putCalls[putCalls.length - 1];
     const body = JSON.parse(lastPut[1].body);
-    expect(body.question.type).toBe("C");
+    expect(body.questions[0].type).toBe("C");
   });
 });
 
@@ -358,7 +360,7 @@ test("the location shows the active stop's real coordinates, not Haarlem/mock", 
     id: "d1", title: "t", city: "Amsterdam", theme: "historical",
     start: { lat: 52.37, lon: 4.90 }, requested_distance_km: 5, actual_distance_km: 1,
     estimated_duration_min: 10,
-    stops: [{ order: 1, poi: { id: "p1", name: "Waag", location: { lat: 52.3728, lon: 4.9036 }, facts: [] }, story: "s", question: null }],
+    stops: [{ order: 1, poi: { id: "p1", name: "Waag", location: { lat: 52.3728, lon: 4.9036 }, facts: [] }, story: "s", questions: [], primary_question_index: null }],
     status: "concept", attributions: [],
   };
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(draftWithStop), { status: 201 })));

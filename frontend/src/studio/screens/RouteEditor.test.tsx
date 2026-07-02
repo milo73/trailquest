@@ -14,7 +14,7 @@ const poi = (id: string, name: string, facts: POI["facts"] = []): POI => ({ id, 
 const draft = (stops: { order: number; poi: POI }[]): DraftTrail => ({
   id: "d1", title: "Haarlems Gouden Eeuw", city: "Haarlem", theme: "historical",
   start: { lat: 52.38, lon: 4.63 }, requested_distance_km: 5, actual_distance_km: 5.2,
-  estimated_duration_min: 110, stops, status: "concept", attributions: [],
+  estimated_duration_min: 110, stops: stops.map((s) => ({ ...s, questions: [] })), status: "concept", attributions: [],
 });
 
 function Harness({ seed }: { seed: DraftTrail }) {
