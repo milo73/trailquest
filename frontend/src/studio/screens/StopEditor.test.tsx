@@ -355,6 +355,71 @@ test("with no active stop, shows the hint and no Regenereer button", async () =>
   expect(screen.queryByRole("button", { name: /Regenereer|Genereren/i })).toBeNull();
 });
 
+test("author two questions and choose the primary; save sends the list", async () => {
+  const draftWithStop = {
+    id: "d1", title: "t", city: "Haarlem", theme: "historical",
+    start: { lat: 52.38, lon: 4.63 }, requested_distance_km: 5, actual_distance_km: 1,
+    estimated_duration_min: 10,
+    stops: [{
+      order: 1,
+      poi: { id: "p1", name: "Waag", location: { lat: 52.38, lon: 4.63 }, facts: [] },
+      story: "Oud gebouw.",
+      questions: [{ type: "A", prompt: "Wanneer gebouwd?", answer: "1370", hint: null, gates: true }],
+      primary_question_index: 0,
+    }],
+    status: "concept", attributions: [],
+  };
+  const fetchMock = vi
+    .fn()
+    .mockResolvedValueOnce(new Response(JSON.stringify(draftWithStop), { status: 201 }))
+    .mockResolvedValue(new Response(JSON.stringify(draftWithStop), { status: 200 }));
+  vi.stubGlobal("fetch", fetchMock);
+  function Seed() {
+    const { setActiveStop, createDraft } = useDraft();
+    return <button onClick={async () => { await createDraft({ start: { lat: 52.38, lon: 4.63 } }); setActiveStop(1); }}>seed</button>;
+  }
+  render(<MemoryRouter><DraftProvider><Seed /><StopEditor /></DraftProvider></MemoryRouter>);
+  await userEvent.click(screen.getByText("seed"));
+
+  // Wait for stop to load (first question prompt field visible)
+  await screen.findByLabelText("Vraagprompt");
+
+  // Add a second question
+  await userEvent.click(screen.getByText("➕ Vraag toevoegen"));
+
+  // There should now be 2 "Vraagprompt" fields
+  const promptFields = screen.getAllByLabelText("Vraagprompt");
+  expect(promptFields).toHaveLength(2);
+
+  // The second question defaults to Type A → primary radio should be enabled
+  // The primary radio for question 2 is disabled unless type canGate (A/D).
+  // Default type for new question is A → canGate = true → radio enabled.
+  const primaryRadios = screen.getAllByRole("radio", { name: /primair \(poort\)/i });
+  expect(primaryRadios).toHaveLength(2);
+  // Q1 radio: enabled (Type A); Q2 radio: enabled (Type A)
+  expect(primaryRadios[0]).not.toBeDisabled();
+  expect(primaryRadios[1]).not.toBeDisabled();
+
+  // Change question 2 to Type B → its primary radio should be disabled (B cannot gate)
+  const typeSelects = screen.getAllByLabelText(/Vraagtype/i);
+  await userEvent.selectOptions(typeSelects[1], "B");
+  // Re-query after state update
+  const radiosAfter = screen.getAllByRole("radio", { name: /primair \(poort\)/i });
+  expect(radiosAfter[1]).toBeDisabled();
+
+  // Click save via the Opslaan button
+  await userEvent.click(screen.getByRole("button", { name: /Opslaan/i }));
+
+  await waitFor(() => {
+    const putCalls = fetchMock.mock.calls.filter((c) => String(c[0]) === "/api/drafts/d1/stops/1");
+    expect(putCalls.length).toBeGreaterThan(0);
+    const lastPut = putCalls[putCalls.length - 1];
+    const body = JSON.parse(lastPut[1].body);
+    expect(body.questions).toHaveLength(2);
+    expect(typeof body.primary_question_index).toBe("number");
+  });
+});
+
 test("the location shows the active stop's real coordinates, not Haarlem/mock", async () => {
   const draftWithStop = {
     id: "d1", title: "t", city: "Amsterdam", theme: "historical",

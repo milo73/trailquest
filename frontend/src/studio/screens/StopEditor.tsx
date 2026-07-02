@@ -36,6 +36,42 @@ const TONES = [
   { value: "verhalend", label: "Verhalend" },
 ];
 
+/** A mutable draft of a single question (mirrors Question but answer/hint always strings) */
+interface DraftQuestion {
+  type: QuestionType;
+  prompt: string;
+  answer: string;
+  hint: string;
+  gates: boolean;
+}
+
+function blankQuestion(): DraftQuestion {
+  return { type: "A", prompt: "", answer: "", hint: "", gates: true };
+}
+
+function seedDraftQuestions(questions: Question[] | null | undefined): DraftQuestion[] {
+  if (!questions || questions.length === 0) return [blankQuestion()];
+  return questions.map((q) => ({
+    type: q.type as QuestionType,
+    prompt: q.prompt,
+    answer: q.answer ?? "",
+    hint: q.hint ?? "",
+    gates: Boolean(q.gates),
+  }));
+}
+
+function buildQuestion(dq: DraftQuestion): Question | null {
+  const gating = canGate(dq.type);
+  if (gating && dq.answer.trim() === "") return null; // validation block
+  return {
+    type: dq.type,
+    prompt: dq.prompt,
+    answer: gating ? dq.answer : null,
+    hint: dq.hint || null,
+    gates: gating && dq.gates,
+  };
+}
+
 export function StopEditor() {
   const navigate = useNavigate();
   const { draft, activeStopOrder, setActiveStop, loadDraft, saving, saveStopContent, generateStopContent } = useDraft();
@@ -58,8 +94,6 @@ export function StopEditor() {
   // Derive from activeStop only; these are only used inside the hasStop branch.
   const activePoi = activeStop?.poi;
   const sourceStory = activeStop?.story ?? "";
-  const primaryIndex = activeStop?.primary_question_index ?? 0;
-  const sourceQuestion = activeStop?.questions?.[primaryIndex] ?? { type: "A" as QuestionType, prompt: "", answer: "", hint: "", gates: true };
 
   // Feiten: track which facts are included (all on by default).
   // Seed from activePoi so switching to a real POI with different fact keys
@@ -75,25 +109,141 @@ export function StopEditor() {
   // Verhaal state
   const [story, setStory] = useState(sourceStory);
 
-  // Opdracht state
-  const [prompt, setPrompt] = useState(sourceQuestion.prompt);
-  const [answer, setAnswer] = useState(sourceQuestion.answer ?? "");
-  const [hint, setHint] = useState(sourceQuestion.hint ?? "");
-  const [questionType, setQuestionType] = useState<QuestionType>(sourceQuestion.type as QuestionType);
-  const [gatesNext, setGatesNext] = useState<boolean>(Boolean(sourceQuestion.gates) && canGate(sourceQuestion.type as QuestionType));
-  const [answerError, setAnswerError] = useState(false);
+  // Multi-question state
+  const [questions, setQuestions] = useState<DraftQuestion[]>(() =>
+    seedDraftQuestions(activeStop?.questions)
+  );
+  const [primaryIndex, setPrimaryIndex] = useState<number>(activeStop?.primary_question_index ?? 0);
+  const [answerErrors, setAnswerErrors] = useState<boolean[]>([]);
+
   const [tone, setTone] = useState("speels");
   const [regenerating, setRegenerating] = useState(false);
   const [regenError, setRegenError] = useState(false);
 
   useEffect(() => {
     setStory(sourceStory);
-    setPrompt(sourceQuestion.prompt);
-    setAnswer(sourceQuestion.answer ?? "");
-    setHint(sourceQuestion.hint ?? "");
-    setQuestionType(sourceQuestion.type as QuestionType);
-    setGatesNext(Boolean(sourceQuestion.gates) && canGate(sourceQuestion.type as QuestionType));
+    const seeded = seedDraftQuestions(activeStop?.questions);
+    setQuestions(seeded);
+    setPrimaryIndex(activeStop?.primary_question_index ?? 0);
+    setAnswerErrors([]);
   }, [activeStop?.order, activePoi?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Helpers ──────────────────────────────────────────────────────────────
+
+  function updateQuestion(index: number, patch: Partial<DraftQuestion>) {
+    setQuestions((prev) => {
+      const next = prev.map((q, i) => (i === index ? { ...q, ...patch } : q));
+      return next;
+    });
+  }
+
+  function handleTypeChange(index: number, newType: QuestionType) {
+    const gates = canGate(newType);
+    setQuestions((prev) =>
+      prev.map((q, i) =>
+        i === index ? { ...q, type: newType, gates: gates ? q.gates : false } : q
+      )
+    );
+    // If this row is the primary and the new type can't gate, move primary to first gating row
+    setPrimaryIndex((prev) => {
+      if (prev === index && !gates) {
+        const firstGating = questions.findIndex((q, i) => i !== index && canGate(q.type));
+        return firstGating >= 0 ? firstGating : prev;
+      }
+      return prev;
+    });
+  }
+
+  function addQuestion() {
+    setQuestions((prev) => [...prev, blankQuestion()]);
+    setAnswerErrors((prev) => [...prev, false]);
+  }
+
+  function removeQuestion(index: number) {
+    setQuestions((prev) => {
+      const next = prev.filter((_, i) => i !== index);
+      return next;
+    });
+    setPrimaryIndex((prev) => {
+      if (prev === index) {
+        // deleted the primary; pick the first gating row if any, else 0
+        const remaining = questions.filter((_, i) => i !== index);
+        const firstGating = remaining.findIndex((q) => canGate(q.type));
+        return firstGating >= 0 ? firstGating : 0;
+      }
+      if (prev > index) return prev - 1;
+      return prev;
+    });
+    setAnswerErrors((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  // Build and validate the full list, returning null if any primary answer is missing
+  function buildAllQuestions(): Question[] | null {
+    const newErrors = questions.map(() => false);
+    let valid = true;
+    const built = questions.map((dq, i) => {
+      const q = buildQuestion(dq);
+      if (q === null && i === primaryIndex) {
+        newErrors[i] = true;
+        valid = false;
+        return null;
+      }
+      if (q === null) {
+        // non-primary with missing answer: build it as non-gating
+        return {
+          type: dq.type,
+          prompt: dq.prompt,
+          answer: null,
+          hint: dq.hint || null,
+          gates: false,
+        } as Question;
+      }
+      return q;
+    });
+    setAnswerErrors(newErrors);
+    if (!valid) return null;
+    return built as Question[];
+  }
+
+  async function saveAllQuestions(qs: DraftQuestion[], primIdx: number) {
+    if (activeStopOrder === undefined) return;
+    const newErrors = qs.map(() => false);
+    let valid = true;
+    const built = qs.map((dq, i) => {
+      const q = buildQuestion(dq);
+      if (q === null && i === primIdx) {
+        newErrors[i] = true;
+        valid = false;
+        return null;
+      }
+      if (q === null) {
+        return {
+          type: dq.type,
+          prompt: dq.prompt,
+          answer: null,
+          hint: dq.hint || null,
+          gates: false,
+        } as Question;
+      }
+      return q;
+    });
+    setAnswerErrors(newErrors);
+    if (!valid) return;
+    await saveStopContent(activeStopOrder, {
+      questions: built as Question[],
+      primary_question_index: primIdx,
+    });
+  }
+
+  async function handleSave() {
+    if (activeStopOrder === undefined) return;
+    const built = buildAllQuestions();
+    if (built === null) return;
+    await saveStopContent(activeStopOrder, {
+      questions: built,
+      primary_question_index: primaryIndex,
+    });
+  }
 
   async function handleRegenerate() {
     if (activeStopOrder === undefined) return;
@@ -102,14 +252,17 @@ export function StopEditor() {
     setRegenerating(true);
     try {
       const result = await generateStopContent(activeStopOrder, { fact_keys: factKeys, tone });
-      const primaryQuestion = result.questions[result.primary_question_index ?? 0];
       setStory(result.story);
-      setPrompt(primaryQuestion.prompt);
-      setAnswer(primaryQuestion.answer ?? "");
-      setHint(primaryQuestion.hint ?? "");
-      setQuestionType(primaryQuestion.type as QuestionType);
-      setGatesNext(Boolean(primaryQuestion.gates) && canGate(primaryQuestion.type as QuestionType));
-      await saveStopContent(activeStopOrder, { story: result.story, questions: result.questions, primary_question_index: result.primary_question_index });
+      const seeded = seedDraftQuestions(result.questions);
+      setQuestions(seeded);
+      const newPrimary = result.primary_question_index ?? 0;
+      setPrimaryIndex(newPrimary);
+      setAnswerErrors([]);
+      await saveStopContent(activeStopOrder, {
+        story: result.story,
+        questions: result.questions,
+        primary_question_index: newPrimary,
+      });
     } catch {
       setRegenError(true);
     } finally {
@@ -117,48 +270,15 @@ export function StopEditor() {
     }
   }
 
-  function buildQuestionWith(type: QuestionType, gates: boolean): Question | null {
-    const gating = canGate(type);
-    if (gating && answer.trim() === "") {
-      setAnswerError(true);
-      return null;
-    }
-    setAnswerError(false);
-    return {
-      type,
-      prompt,
-      answer: gating ? answer : null,
-      hint: hint || null,
-      gates: gating && gates,
-    };
-  }
-
-  async function saveQuestionWith(type: QuestionType, gates: boolean) {
-    if (activeStopOrder === undefined) return;
-    const q = buildQuestionWith(type, gates);
-    if (q === null) return;
-    await saveStopContent(activeStopOrder, { questions: [q], primary_question_index: 0 });
-  }
-
-  async function saveQuestion() {
-    return saveQuestionWith(questionType, gatesNext);
-  }
-
   async function saveStory() {
     if (activeStopOrder === undefined) return;
     await saveStopContent(activeStopOrder, { story });
   }
 
-  function handleTypeChange(newType: QuestionType) {
-    setQuestionType(newType);
-    if (!canGate(newType)) {
-      setGatesNext(false);
-    }
-  }
-
-  const gateDisabled = !canGate(questionType);
-
   const mapStops = [{ order: 4, label: "4" }];
+
+  // For the preview panel, show the primary question's prompt
+  const primaryQ = questions[primaryIndex] ?? questions[0];
 
   return (
     <StudioChrome breadcrumb="stop-editor">
@@ -292,7 +412,9 @@ export function StopEditor() {
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#6f8a4f" strokeWidth="2.4">
                 <path d="M5 12l4 4 10-10" />
               </svg>
-              Opdracht {canGate(questionType) ? "kan gaten" : "gaten uit"} (Type {questionType})
+              {primaryQ && canGate(primaryQ.type)
+                ? `Primair kan gaten (Type ${primaryQ.type})`
+                : `Primair gaten uit (Type ${primaryQ?.type ?? "?"})`}
             </div>
           </div>
           )}
@@ -577,7 +699,7 @@ export function StopEditor() {
                 </div>
               </div>
 
-              {/* OPDRACHT */}
+              {/* OPDRACHTEN — multi-question list */}
               <div
                 style={{
                   border: "1px solid #e6dcc6",
@@ -600,166 +722,285 @@ export function StopEditor() {
                     <path d="M9.5 9.5a2.5 2.5 0 1 1 3.2 2.4c-.8.3-1.2.8-1.2 1.6M12 17h.01" />
                   </svg>
                   <span style={{ font: "700 12px/1 var(--tq-mono)", color: "#283a5e", letterSpacing: 1 }}>
-                    OPDRACHT
+                    OPDRACHTEN
                   </span>
-                </div>
-                <div style={{ padding: "15px 18px", display: "flex", gap: 18, alignItems: "flex-start" }}>
-                  {/* Left: question text + answer */}
-                  <div style={{ flex: 1 }}>
-                    <input
-                      aria-label="Vraagprompt"
-                      value={prompt}
-                      onChange={(e) => setPrompt(e.target.value)}
-                      onBlur={saveQuestion}
-                      style={{
-                        width: "100%",
-                        font: "500 15px/1.5 var(--tq-sans)",
-                        color: "#36322b",
-                        border: "1px solid #e6dcc6",
-                        borderRadius: 8,
-                        padding: "8px 10px",
-                        background: "#fdfbf6",
-                        boxSizing: "border-box",
-                        marginBottom: 13,
-                      }}
-                    />
-                    {canGate(questionType) && (
-                      <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 10 }}>
-                        <span style={{ font: "600 11px/1 var(--tq-mono)", color: "#8a7f6d" }}>ANTWOORD</span>
-                        <input
-                          aria-label="Antwoord"
-                          value={answer}
-                          onChange={(e) => setAnswer(e.target.value)}
-                          onBlur={saveQuestion}
-                          style={{
-                            font: "700 14px/1 var(--tq-sans)",
-                            color: "#211f1b",
-                            background: "#f1f3f8",
-                            border: "1px solid #d4dae6",
-                            borderRadius: 8,
-                            padding: "8px 12px",
-                          }}
-                        />
-                        <span style={{ font: "500 11px/1.3 var(--tq-sans)", color: "#8a7f6d" }}>
-                          afgeleid uit de data — daarom controleerbaar
-                        </span>
-                      </div>
-                    )}
-                    {answerError && (
-                      <div style={{ font: "500 11px/1.3 var(--tq-sans)", color: "#b5453a", marginBottom: 8 }}>
-                        Antwoord verplicht voor een poortvraag
-                      </div>
-                    )}
-                    <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-                      <span style={{ font: "600 11px/1 var(--tq-mono)", color: "#8a7f6d" }}>HINT</span>
-                      <input
-                        aria-label="Hint"
-                        value={hint}
-                        onChange={(e) => setHint(e.target.value)}
-                        onBlur={saveQuestion}
-                        style={{
-                          flex: 1,
-                          font: "500 13px/1 var(--tq-sans)",
-                          color: "#36322b",
-                          background: "#fdfbf6",
-                          border: "1px solid #e6dcc6",
-                          borderRadius: 8,
-                          padding: "7px 10px",
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Right: type panel + gate toggle */}
-                  <div
+                  <span style={{ font: "500 11px/1 var(--tq-sans)", color: "#8a7f6d", marginLeft: 4 }}>
+                    {questions.length} vraag{questions.length !== 1 ? "en" : ""}
+                  </span>
+                  <Button
+                    variant="secondary"
+                    onClick={handleSave}
                     style={{
-                      width: 210,
-                      flexShrink: 0,
-                      background: "#fdfbf6",
-                      border: "1px solid #e6dcc6",
-                      borderRadius: 11,
-                      padding: 13,
+                      marginLeft: "auto",
+                      height: "auto",
+                      padding: "6px 10px",
+                      borderRadius: 7,
+                      fontSize: 11,
                     }}
                   >
-                    <label
-                      htmlFor="vraagtype-select"
-                      style={{
-                        display: "block",
-                        font: "600 10px/1 var(--tq-mono)",
-                        color: "#8a7f6d",
-                        letterSpacing: 1,
-                        marginBottom: 9,
-                      }}
-                    >
-                      VRAAGTYPE
-                    </label>
-                    <select
-                      id="vraagtype-select"
-                      aria-label="Vraagtype"
-                      value={questionType}
-                      onChange={(e) => {
-                        const newType = e.target.value as QuestionType;
-                        handleTypeChange(newType);
-                        void saveQuestionWith(newType, canGate(newType) ? gatesNext : false);
-                      }}
-                      style={{
-                        width: "100%",
-                        font: "600 12px/1 var(--tq-sans)",
-                        color: "#211f1b",
-                        border: "1.5px solid #9fb87f",
-                        borderRadius: 8,
-                        padding: "8px 10px",
-                        background: "#e7eed7",
-                        cursor: "pointer",
-                        marginBottom: 6,
-                      }}
-                    >
-                      {(["A", "B", "C", "D"] as QuestionType[]).map((t) => (
-                        <option key={t} value={t}>
-                          {TYPE_LABELS[t]}
-                          {TYPE_SUBLABEL[t] ? ` · ${TYPE_SUBLABEL[t]}` : ""}
-                        </option>
-                      ))}
-                    </select>
+                    Opslaan
+                  </Button>
+                </div>
 
-                    {/* Gate toggle */}
-                    <div
-                      style={{
-                        marginTop: 11,
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 7,
-                        background: gatesNext ? "#e7eed7" : "#f3f3f3",
-                        borderRadius: 8,
-                        padding: "8px 10px",
-                        opacity: gateDisabled ? 0.5 : 1,
-                      }}
-                    >
-                      <input
-                        role="switch"
-                        type="checkbox"
-                        aria-label="Mag volgende stop gaten"
-                        checked={gatesNext}
-                        disabled={gateDisabled}
-                        onChange={(e) => {
-                          if (!gateDisabled) {
-                            const checked = e.target.checked;
-                            setGatesNext(checked);
-                            void saveQuestionWith(questionType, checked);
-                          }
-                        }}
-                        style={{ width: 30, height: 18, cursor: gateDisabled ? "not-allowed" : "pointer" }}
-                      />
-                      <span
+                <div style={{ padding: "14px 18px", display: "flex", flexDirection: "column", gap: 16 }}>
+                  {questions.map((dq, qIdx) => {
+                    const gating = canGate(dq.type);
+                    const isPrimary = qIdx === primaryIndex;
+                    const hasAnswerError = answerErrors[qIdx] ?? false;
+
+                    return (
+                      <div
+                        key={qIdx}
                         style={{
-                          font: "600 11px/1.2 var(--tq-sans)",
-                          color: gatesNext ? "#3a5a2f" : "#8a7f6d",
+                          border: isPrimary ? "1.5px solid #283a5e" : "1px solid #e6dcc6",
+                          borderRadius: 11,
+                          background: isPrimary ? "#f7f9fd" : "#fdfbf6",
+                          padding: 14,
+                          display: "flex",
+                          gap: 14,
+                          alignItems: "flex-start",
+                          position: "relative",
                         }}
                       >
-                        Mag volgende stop gaten
-                      </span>
-                    </div>
-                  </div>
+                        {/* Primary radio + question number */}
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, paddingTop: 2, flexShrink: 0 }}>
+                          <span style={{ font: "600 10px/1 var(--tq-mono)", color: "#8a7f6d", letterSpacing: 0.5 }}>
+                            #{qIdx + 1}
+                          </span>
+                          <label
+                            style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, cursor: gating ? "pointer" : "not-allowed", opacity: gating ? 1 : 0.4 }}
+                            title={gating ? "Stel in als primaire poortvraag" : "Alleen type A of D kan een poortvraag zijn"}
+                          >
+                            <input
+                              type="radio"
+                              aria-label={`Primair (poort) vraag ${qIdx + 1}`}
+                              name="primary-question"
+                              checked={isPrimary}
+                              disabled={!gating}
+                              onChange={() => {
+                                if (gating) setPrimaryIndex(qIdx);
+                              }}
+                              style={{ cursor: gating ? "pointer" : "not-allowed" }}
+                            />
+                            <span style={{ font: "500 9px/1 var(--tq-sans)", color: isPrimary ? "#283a5e" : "#8a7f6d", textAlign: "center", maxWidth: 36 }}>
+                              primair (poort)
+                            </span>
+                          </label>
+                        </div>
+
+                        {/* Question content */}
+                        <div style={{ flex: 1, display: "flex", gap: 14, alignItems: "flex-start" }}>
+                          {/* Left: prompt + answer + hint */}
+                          <div style={{ flex: 1 }}>
+                            <input
+                              aria-label="Vraagprompt"
+                              value={dq.prompt}
+                              onChange={(e) => updateQuestion(qIdx, { prompt: e.target.value })}
+                              onBlur={() => saveAllQuestions(questions, primaryIndex)}
+                              placeholder="Voer de vraag in…"
+                              style={{
+                                width: "100%",
+                                font: "500 14px/1.5 var(--tq-sans)",
+                                color: "#36322b",
+                                border: "1px solid #e6dcc6",
+                                borderRadius: 8,
+                                padding: "7px 10px",
+                                background: "#fdfbf6",
+                                boxSizing: "border-box",
+                                marginBottom: 10,
+                              }}
+                            />
+                            {gating && (
+                              <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 8 }}>
+                                <span style={{ font: "600 11px/1 var(--tq-mono)", color: "#8a7f6d", flexShrink: 0 }}>ANTWOORD</span>
+                                <input
+                                  aria-label="Antwoord"
+                                  value={dq.answer}
+                                  onChange={(e) => updateQuestion(qIdx, { answer: e.target.value })}
+                                  onBlur={() => saveAllQuestions(questions, primaryIndex)}
+                                  style={{
+                                    font: "700 13px/1 var(--tq-sans)",
+                                    color: "#211f1b",
+                                    background: "#f1f3f8",
+                                    border: "1px solid #d4dae6",
+                                    borderRadius: 8,
+                                    padding: "7px 11px",
+                                  }}
+                                />
+                                <span style={{ font: "500 10px/1.3 var(--tq-sans)", color: "#8a7f6d" }}>
+                                  afgeleid uit data
+                                </span>
+                              </div>
+                            )}
+                            {hasAnswerError && (
+                              <div style={{ font: "500 11px/1.3 var(--tq-sans)", color: "#b5453a", marginBottom: 6 }}>
+                                Antwoord verplicht voor een poortvraag
+                              </div>
+                            )}
+                            <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+                              <span style={{ font: "600 11px/1 var(--tq-mono)", color: "#8a7f6d", flexShrink: 0 }}>HINT</span>
+                              <input
+                                aria-label="Hint"
+                                value={dq.hint}
+                                onChange={(e) => updateQuestion(qIdx, { hint: e.target.value })}
+                                onBlur={() => saveAllQuestions(questions, primaryIndex)}
+                                style={{
+                                  flex: 1,
+                                  font: "500 12px/1 var(--tq-sans)",
+                                  color: "#36322b",
+                                  background: "#fdfbf6",
+                                  border: "1px solid #e6dcc6",
+                                  borderRadius: 8,
+                                  padding: "6px 9px",
+                                }}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Right: type select */}
+                          <div
+                            style={{
+                              width: 190,
+                              flexShrink: 0,
+                              background: "#fdfbf6",
+                              border: "1px solid #e6dcc6",
+                              borderRadius: 11,
+                              padding: 11,
+                            }}
+                          >
+                            <label
+                              htmlFor={`vraagtype-select-${qIdx}`}
+                              style={{
+                                display: "block",
+                                font: "600 10px/1 var(--tq-mono)",
+                                color: "#8a7f6d",
+                                letterSpacing: 1,
+                                marginBottom: 7,
+                              }}
+                            >
+                              VRAAGTYPE
+                            </label>
+                            <select
+                              id={`vraagtype-select-${qIdx}`}
+                              aria-label={`Vraagtype ${qIdx + 1}`}
+                              value={dq.type}
+                              onChange={(e) => {
+                                const newType = e.target.value as QuestionType;
+                                handleTypeChange(qIdx, newType);
+                                // immediate save with new type applied
+                                const nextQuestions = questions.map((q, i) =>
+                                  i === qIdx ? { ...q, type: newType, gates: canGate(newType) ? q.gates : false } : q
+                                );
+                                let nextPrimary = primaryIndex;
+                                if (primaryIndex === qIdx && !canGate(newType)) {
+                                  const firstGating = nextQuestions.findIndex((q, i) => i !== qIdx && canGate(q.type));
+                                  nextPrimary = firstGating >= 0 ? firstGating : primaryIndex;
+                                }
+                                void saveAllQuestions(nextQuestions, nextPrimary);
+                              }}
+                              style={{
+                                width: "100%",
+                                font: "600 12px/1 var(--tq-sans)",
+                                color: "#211f1b",
+                                border: "1.5px solid #9fb87f",
+                                borderRadius: 8,
+                                padding: "7px 9px",
+                                background: "#e7eed7",
+                                cursor: "pointer",
+                              }}
+                            >
+                              {(["A", "B", "C", "D"] as QuestionType[]).map((t) => (
+                                <option key={t} value={t}>
+                                  {TYPE_LABELS[t]}
+                                  {TYPE_SUBLABEL[t] ? ` · ${TYPE_SUBLABEL[t]}` : ""}
+                                </option>
+                              ))}
+                            </select>
+
+                            {/* Gate toggle — always shown for all questions; primary is locked-on */}
+                            <div
+                              style={{
+                                marginTop: 9,
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 6,
+                                background: (gating && (isPrimary || dq.gates)) ? "#e7eed7" : "#f3f3f3",
+                                borderRadius: 8,
+                                padding: "7px 9px",
+                                opacity: gating ? 1 : 0.5,
+                              }}
+                            >
+                              <input
+                                role="switch"
+                                type="checkbox"
+                                aria-label="Mag volgende stop gaten"
+                                checked={gating && (isPrimary || dq.gates)}
+                                disabled={!gating || isPrimary}
+                                onChange={(e) => {
+                                  if (!gating || isPrimary) return;
+                                  const checked = e.target.checked;
+                                  updateQuestion(qIdx, { gates: checked });
+                                  const nextQuestions = questions.map((q, i) =>
+                                    i === qIdx ? { ...q, gates: checked } : q
+                                  );
+                                  void saveAllQuestions(nextQuestions, primaryIndex);
+                                }}
+                                style={{ width: 28, height: 16, cursor: (!gating || isPrimary) ? "not-allowed" : "pointer" }}
+                              />
+                              <span style={{ font: "600 10px/1.2 var(--tq-sans)", color: (gating && (isPrimary || dq.gates)) ? "#3a5a2f" : "#8a7f6d" }}>
+                                {isPrimary ? "Primair (poort)" : "Mag volgende stop gaten"}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Remove button */}
+                        <button
+                          aria-label={`Vraag ${qIdx + 1} verwijderen`}
+                          onClick={() => removeQuestion(qIdx)}
+                          disabled={questions.length <= 1}
+                          style={{
+                            flexShrink: 0,
+                            width: 26,
+                            height: 26,
+                            borderRadius: 6,
+                            border: "1px solid #e6dcc6",
+                            background: "#fff",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            cursor: questions.length <= 1 ? "not-allowed" : "pointer",
+                            opacity: questions.length <= 1 ? 0.35 : 1,
+                            padding: 0,
+                          }}
+                        >
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#b5453a" strokeWidth="2.2">
+                            <path d="M18 6 6 18M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    );
+                  })}
+
+                  {/* Add question button */}
+                  <button
+                    onClick={addQuestion}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 7,
+                      alignSelf: "flex-start",
+                      font: "600 12px/1 var(--tq-sans)",
+                      color: "#283a5e",
+                      background: "#f0f3fa",
+                      border: "1px dashed #b0bcd4",
+                      borderRadius: 8,
+                      padding: "8px 14px",
+                      cursor: "pointer",
+                    }}
+                  >
+                    ➕ Vraag toevoegen
+                  </button>
                 </div>
               </div>
             </>
@@ -848,9 +1089,9 @@ export function StopEditor() {
                     margin: "0 0 10px",
                   }}
                 >
-                  {prompt.length > 80
-                    ? prompt.slice(0, 77) + "…"
-                    : prompt}
+                  {primaryQ?.prompt && primaryQ.prompt.length > 80
+                    ? primaryQ.prompt.slice(0, 77) + "…"
+                    : (primaryQ?.prompt ?? "")}
                 </p>
                 <div style={{ display: "flex", gap: 7 }}>
                   <span
