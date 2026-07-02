@@ -123,7 +123,7 @@ src/
 | Feature | Wired to backend | Client-side / mock |
 |---|---|---|
 | Trail generation (`POST /trails`) | yes | — |
-| Answer checking (`POST /trails/{id}/stops/{idx}/answer`) | yes | — |
+| Answer checking (`POST /trails/{id}/answer`, optional `question_index`) | yes | — |
 | Points and badges | — | yes (`gamification.ts`) |
 | Star rating | — | yes (local state) |
 | Studio drafts (`POST/GET/PUT /drafts`) | yes | — |
