@@ -18,13 +18,17 @@ primary slot. It is additive to *content*; it introduces no identity/persistence
 
 ## 2. Decisions (locked)
 
-- **One primary gates, rest bonus.** A stop designates a `primary_question_index`; the primary
-  must be a gateable question (Type A or D, with an answer). Bonus questions may be any type and
-  **never** unlock the next stop.
-- **Player stops always have a gating primary** (route generation already drops POIs without
-  verifiable facts), so `Stop.primary_question_index` is required. **Draft stops may be ungated**
-  (a factless/custom stop with only a reflection), so `DraftStop.primary_question_index` is
-  optional; publishing still requires a gating primary (validation).
+- **One primary, rest bonus.** A stop designates a `primary_question_index` — the *main*
+  question. Its **type** decides gating exactly like today's single question (A/D block on
+  correctness, C gates-through, B honor); bonus questions **never** unlock the next stop
+  regardless of type.
+- **Model invariant is index-in-range only** (`0 <= primary_question_index < len(questions)`), NOT
+  "must gate" — a reflection primary is playable (gates-through), so runtime `Stop`s never crash on
+  a POI whose facts don't yield a data-bound question. `Stop.primary_question_index` is a required
+  `int`; `DraftStop.primary_question_index` is optional (`None` only when it has no questions yet).
+- **Publish validation enforces a real gate:** a new blocking `primary_gate` check requires each
+  stop's primary question to be a gating type (A/D). So reflection-only stops are *playable* but not
+  *publishable* until the creator adds a gating question — "quality is a gate".
 - **Back-compat, no manual migration.** Persisted `<id>.json` drafts and SQLite content rows use
   the singular `question`; a pydantic `mode="before"` validator lifts it into `questions`.
 - Player answer API stays keyed on `stop_order`; a new optional `question_index` defaults to the
@@ -37,8 +41,9 @@ primary slot. It is additive to *content*; it introduces no identity/persistence
 
 - **`Stop`**: replace `question: Question` with
   `questions: list[Question]` (min length 1) and `primary_question_index: int`.
-  - `model_post_init` invariant: `questions[primary_question_index].gates is True` (primary is A/D
-    with an answer); raise `ValueError` otherwise. `@property primary_question` returns it.
+  - `model_post_init` invariant: `0 <= primary_question_index < len(questions)`; raise `ValueError`
+    otherwise. (No "must gate" requirement — the primary's type decides gating.)
+    `@property primary_question` returns it.
 - **`DraftStop`**: replace `question: Question | None` with
   `questions: list[Question] = []` and `primary_question_index: int | None = None`
   (optional — authored later; validation enforces publishability).
@@ -60,9 +65,11 @@ bonus questions never advance the stop.
   `_build_questions(poi) -> tuple[list[Question], int | None]`:
   - Build one **Type-A** data-bound question for **each** fact whose key is in
     `_DATA_BOUND_TEMPLATES` (bounded by the template set, ≤5), in fact order.
-  - Append one **Type-C** reflection question ("Kijk eens rond bij {name}…") as a bonus.
-  - If at least one data-bound question exists → `primary_index = 0` (the first A). Otherwise the
-    list is `[reflection]` and `primary_index = None` (ungated — only reachable for factless POIs).
+  - Always append one **Type-C** reflection question ("Kijk eens rond bij {name}…") as a bonus, so
+    the list is never empty.
+  - `primary_index = 0` — the first data-bound question when any exist, else the reflection. (For a
+    grounded POI this is the gating A; for a POI with no data-bound fact it is the reflection, which
+    is playable but blocks publish via the `primary_gate` check.)
 - `build_stop(poi, theme, order)` and `author_content(poi, theme, tone)` return the list + primary
   index and construct `Stop(..., questions=..., primary_question_index=...)`.
   `author_content` returns `(story, questions, primary_index)`.
@@ -122,8 +129,8 @@ bonus questions never advance the stop.
 **Backend (pytest, offline):**
 - `Stop` invariant (primary must gate; raises otherwise); `Stop`/`DraftStop` `mode="before"`
   validator lifts a legacy singular `question` (checked-in legacy JSON fixture).
-- `_build_questions`: a multi-fact POI yields several Type-A + a reflection with primary 0; a
-  factless POI yields `[reflection]`, primary `None`.
+- `_build_questions`: a multi-fact POI yields several Type-A + a trailing reflection with primary 0;
+  a POI with no data-bound fact yields `[reflection]` with primary 0 (playable, gates-through).
 - `evaluate_in_stop`: the primary gates per type; a bonus question returns `unlocked_next=False`
   even when correct/pass-through.
 - `evaluate` feedback is Dutch (assert the Dutch correct/reveal/reflection strings).
