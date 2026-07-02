@@ -12,17 +12,8 @@ export function Stop() {
   const { state, recordSolve, arriveAtNextOrFinish } = useQuester();
   const trail = state.trail!;
   const stop = trail.stops.find((s) => s.order === state.currentOrder)!;
-  const { poi, story, questions } = stop;
-  const primaryIndex = stop.primary_question_index;
-  const question = questions[primaryIndex];
-  if (!question) return null;
 
-  // Distinct fact sources (by source name)
-  const distinctSources = Array.from(
-    new Map(poi.facts.map((f) => [f.source.name, f.source])).values()
-  );
-
-  // Primary question state
+  // Primary question state — hooks must run unconditionally before any early return
   const [answer, setAnswer] = useState("");
   const [attempt, setAttempt] = useState(1);
   const [usedHint, setUsedHint] = useState(false);
@@ -35,6 +26,17 @@ export function Stop() {
   // Bonus question state (keyed by question index)
   const [bonusAnswers, setBonusAnswers] = useState<Record<number, string>>({});
   const [bonusFeedback, setBonusFeedback] = useState<Record<number, string>>({});
+
+  // Derivations that depend on stop data — after all hooks
+  const { poi, story, questions } = stop;
+  const primaryIndex = stop.primary_question_index;
+  const question = questions[primaryIndex];
+  if (!question) return null;
+
+  // Distinct fact sources (by source name)
+  const distinctSources = Array.from(
+    new Map(poi.facts.map((f) => [f.source.name, f.source])).values()
+  );
 
   async function handleSubmit() {
     const result = await submitAnswer(trail.id, {
