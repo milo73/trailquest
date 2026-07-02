@@ -15,6 +15,7 @@ export function Stop() {
   const { poi, story, questions } = stop;
   const primaryIndex = stop.primary_question_index;
   const question = questions[primaryIndex];
+  if (!question) return null;
 
   // Distinct fact sources (by source name)
   const distinctSources = Array.from(
