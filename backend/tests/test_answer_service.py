@@ -55,5 +55,6 @@ def test_observe_count_is_honor_system() -> None:
 def test_correct_feedback_is_dutch():
     from app.models.schemas import Question, QuestionType
     from app.services import answer_service
+
     q = Question(type=QuestionType.DATA_BOUND, prompt="Hoe hoog?", answer="78")
     assert "volgende stop" in answer_service.evaluate(q, "78", 1).feedback.lower()

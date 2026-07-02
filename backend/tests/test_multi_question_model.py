@@ -1,6 +1,6 @@
 import pytest
 
-from app.models.schemas import DraftStop, GeoPoint, POI, Question, QuestionType, Stop
+from app.models.schemas import POI, DraftStop, GeoPoint, Question, QuestionType, Stop
 
 
 def _poi() -> POI:

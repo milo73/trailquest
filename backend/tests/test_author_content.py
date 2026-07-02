@@ -20,10 +20,13 @@ def _poi() -> POI:
 
 def test_author_content_grounds_in_facts_and_builds_question():
     content_cache.clear()
-    story, question = content_service.author_content(_poi(), Theme.HISTORICAL, tone="speels")
+    story, questions, primary_index = content_service.author_content(
+        _poi(), Theme.HISTORICAL, tone="speels"
+    )
     assert "78" in story  # grounded in the supplied fact (stub echoes facts offline)
-    assert question.type == "A"  # height_m is a data-bound template
-    assert question.answer == "78"
+    primary = questions[primary_index]
+    assert primary.type == "A"  # height_m is a data-bound template
+    assert primary.answer == "78"
 
 
 def test_author_content_does_not_touch_the_cache():

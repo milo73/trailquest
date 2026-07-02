@@ -1,12 +1,17 @@
-from app.models.schemas import GeoPoint, POI, Question, QuestionType, Stop
+from app.models.schemas import POI, GeoPoint, Question, QuestionType, Stop
 from app.services import answer_service
 
 
 def _stop() -> Stop:
     primary = Question(type=QuestionType.DATA_BOUND, prompt="Hoe hoog?", answer="78")
     bonus = Question(type=QuestionType.DATA_BOUND, prompt="Bouwjaar?", answer="1520")
-    return Stop(order=1, poi=POI(id="p", name="Toren", location=GeoPoint(lat=52.0, lon=4.0)),
-                story="s", questions=[primary, bonus], primary_question_index=0)
+    return Stop(
+        order=1,
+        poi=POI(id="p", name="Toren", location=GeoPoint(lat=52.0, lon=4.0)),
+        story="s",
+        questions=[primary, bonus],
+        primary_question_index=0,
+    )
 
 
 def test_primary_correct_unlocks():

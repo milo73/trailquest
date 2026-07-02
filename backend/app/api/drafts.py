@@ -56,7 +56,13 @@ def create_custom_stop(draft_id: str, req: CustomStopRequest) -> DraftTrail:
 
 @router.put("/{draft_id}/stops/{order}", response_model=DraftTrail)
 def update_stop_content(draft_id: str, order: int, req: StopContentUpdate) -> DraftTrail:
-    draft = draft_service.set_stop_content(draft_id, order, story=req.story, question=req.question)
+    draft = draft_service.set_stop_content(
+        draft_id,
+        order,
+        story=req.story,
+        questions=req.questions,
+        primary_question_index=req.primary_question_index,
+    )
     if draft is None:
         raise HTTPException(status_code=404, detail="Draft or stop not found")
     return draft
@@ -71,8 +77,10 @@ def generate_stop_content(
     )
     if result is None:
         raise HTTPException(status_code=404, detail="Draft or stop not found")
-    story, question = result
-    return StopGenerateResult(story=story, question=question)
+    story, questions, primary_index = result
+    return StopGenerateResult(
+        story=story, questions=questions, primary_question_index=primary_index
+    )
 
 
 @router.get("/{draft_id}/validation", response_model=ValidationResult)
