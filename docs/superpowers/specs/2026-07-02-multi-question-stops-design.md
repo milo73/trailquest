@@ -76,6 +76,12 @@ bonus questions never advance the stop.
     existing per-type gating);
   - else (a **bonus** question) → `evaluate(...)` for correctness/feedback but return it with
     `unlocked_next=False` (bonus never advances).
+- **Translate the `answer_service.evaluate` feedback strings to Dutch** (they are the last
+  English player-facing copy): "Correct! On to the next stop." → "Correct! Door naar de volgende
+  stop."; the reflection line → "Bedankt voor het delen — hier is geen fout antwoord."; the
+  observe/count line → "Goed gespot! (We vertrouwen je telling hier.)"; the reveal line →
+  "Het antwoord was: {answer}. We gaan verder."; "Not quite." → "Net niet."; the hint variant →
+  "Net niet. Tip: {hint}". Update any test asserting the old English strings.
 - `backend/app/api/trails.py` `submit_answer`: resolve the stop by `stop_order`; bounds-check the
   resolved index (→ 404 on out-of-range); call `evaluate_in_stop`.
 
@@ -120,6 +126,7 @@ bonus questions never advance the stop.
   factless POI yields `[reflection]`, primary `None`.
 - `evaluate_in_stop`: the primary gates per type; a bonus question returns `unlocked_next=False`
   even when correct/pass-through.
+- `evaluate` feedback is Dutch (assert the Dutch correct/reveal/reflection strings).
 - `/trails/{id}/answer`: answering the primary unlocks; answering a bonus does not; out-of-range
   index → 404; omitted `question_index` targets the primary.
 - `draft_service.validate`: a stop with no gating primary trips the `primary_gate` blocking check;
@@ -135,6 +142,4 @@ bonus questions never advance the stop.
 ## 6. Out of scope / follow-ups
 
 - Stages 2–4 (desired-stop-count, creator grounding, stop identity/hydration).
-- Translating the English `answer_service` feedback strings to Dutch (separate small cleanup;
-  noted while touching the answer flow, not folded in here to keep the stage focused).
 - Richer question generation (difficulty, per-fact riddles) beyond the data-bound + reflection MVP.
