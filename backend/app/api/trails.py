@@ -48,4 +48,7 @@ def submit_answer(trail_id: str, req: AnswerRequest) -> AnswerResult:
     if stop is None:
         raise HTTPException(status_code=404, detail="Stop not found")
 
-    return answer_service.evaluate(stop.question, req.answer, req.attempt)
+    idx = req.question_index if req.question_index is not None else stop.primary_question_index
+    if not 0 <= idx < len(stop.questions):
+        raise HTTPException(status_code=404, detail="Question not found")
+    return answer_service.evaluate_in_stop(stop, idx, req.answer, req.attempt)

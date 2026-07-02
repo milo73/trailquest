@@ -16,6 +16,7 @@ from app.models.schemas import (
     AnswerResult,
     Question,
     QuestionType,
+    Stop,
 )
 
 
@@ -29,7 +30,7 @@ def evaluate(question: Question, submitted: str, attempt: int) -> AnswerResult:
         return AnswerResult(
             correct=True,
             unlocked_next=True,
-            feedback="Thanks for sharing — there's no wrong answer here.",
+            feedback="Bedankt voor het delen — hier is geen fout antwoord.",
         )
 
     if question.type is QuestionType.OBSERVE_COUNT:
@@ -38,7 +39,7 @@ def evaluate(question: Question, submitted: str, attempt: int) -> AnswerResult:
             correct=True,
             unlocked_next=True,
             revealed_answer=question.answer,
-            feedback="Nicely spotted! (We trust your count on this one.)",
+            feedback="Goed gespot! (We vertrouwen je telling hier.)",
         )
 
     # Type A / D: gate on correctness.
@@ -46,7 +47,7 @@ def evaluate(question: Question, submitted: str, attempt: int) -> AnswerResult:
     is_correct = _normalize(submitted) == _normalize(question.answer)
     if is_correct:
         return AnswerResult(
-            correct=True, unlocked_next=True, feedback="Correct! On to the next stop."
+            correct=True, unlocked_next=True, feedback="Correct! Door naar de volgende stop."
         )
 
     if attempt >= MAX_ATTEMPTS_BEFORE_REVEAL:
@@ -54,10 +55,22 @@ def evaluate(question: Question, submitted: str, attempt: int) -> AnswerResult:
             correct=False,
             unlocked_next=True,
             revealed_answer=question.answer,
-            feedback=f"The answer was: {question.answer}. Let's keep going.",
+            feedback=f"Het antwoord was: {question.answer}. We gaan verder.",
         )
 
-    feedback = "Not quite."
+    feedback = "Net niet."
     if attempt == 1 and question.hint:
-        feedback = f"Not quite. Hint: {question.hint}"
+        feedback = f"Net niet. Tip: {question.hint}"
     return AnswerResult(correct=False, unlocked_next=False, feedback=feedback)
+
+
+def evaluate_in_stop(
+    stop: Stop, question_index: int | None, submitted: str, attempt: int
+) -> AnswerResult:
+    """Evaluate an answer for a specific question in a stop. Only the primary
+    question gates; bonus questions return feedback but never unlock the next stop."""
+    idx = question_index if question_index is not None else stop.primary_question_index
+    result = evaluate(stop.questions[idx], submitted, attempt)
+    if idx != stop.primary_question_index:
+        return result.model_copy(update={"unlocked_next": False})
+    return result
