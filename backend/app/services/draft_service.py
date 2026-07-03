@@ -63,7 +63,12 @@ def create(req: DraftCreate) -> DraftTrail:
     )
     if req.from_concept:
         trail = route_service.generate_trail(
-            TrailRequest(start=req.start, distance_km=req.distance_km, theme=req.theme)
+            TrailRequest(
+                start=req.start,
+                distance_km=req.distance_km,
+                theme=req.theme,
+                desired_stops=req.desired_stops,
+            )
         )
         draft.stops = [
             DraftStop(
