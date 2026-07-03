@@ -27,8 +27,18 @@ def test_resolve_unresolvable_returns_none():
 
 
 def test_build_grounded_poi_has_wikidata_facts_and_background(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(wikidata, "fetch_entity", lambda qid: EntityData(facts={"build_year": "1520"}, enwiki_title="Grote Kerk"))
-    monkeypatch.setattr(wikipedia, "fetch_summary", lambda title, **k: WikipediaSummary(extract="Een kerk.", url="https://nl.wikipedia.org/wiki/Grote_Kerk"))
+    monkeypatch.setattr(
+        wikidata,
+        "fetch_entity",
+        lambda qid: EntityData(facts={"build_year": "1520"}, enwiki_title="Grote Kerk"),
+    )
+    monkeypatch.setattr(
+        wikipedia,
+        "fetch_summary",
+        lambda title, **k: WikipediaSummary(
+            extract="Een kerk.", url="https://nl.wikipedia.org/wiki/Grote_Kerk"
+        ),
+    )
     poi = grounding_service.build_grounded_poi("Q42", name=None, location=LOC)
     assert poi.id == "wikidata:Q42"
     assert poi.name == "Grote Kerk"
@@ -39,6 +49,7 @@ def test_build_grounded_poi_has_wikidata_facts_and_background(monkeypatch: pytes
 def test_build_grounded_poi_degrades_to_factless_on_client_error(monkeypatch: pytest.MonkeyPatch):
     def _boom(qid):
         raise ClientError("down")
+
     monkeypatch.setattr(wikidata, "fetch_entity", _boom)
     poi = grounding_service.build_grounded_poi("Q42", name="Mijn plek", location=LOC)
     assert poi.facts == [] and poi.id.startswith("custom:") and poi.name == "Mijn plek"

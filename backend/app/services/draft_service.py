@@ -26,7 +26,7 @@ from app.models.schemas import (
     ValidationCheck,
     ValidationResult,
 )
-from app.services import content_service, poi_service, route_service
+from app.services import content_service, grounding_service, poi_service, route_service
 
 
 def _attributions(stops: list[DraftStop]) -> list[str]:
@@ -250,20 +250,29 @@ def validate(draft: DraftTrail) -> ValidationResult:
 
 
 def add_custom_stop(
-    draft_id: str, *, name: str, lat: float | None = None, lon: float | None = None
+    draft_id: str,
+    *,
+    name: str | None = None,
+    lat: float | None = None,
+    lon: float | None = None,
+    source_ref: str | None = None,
 ) -> DraftTrail | None:
     draft = drafts.get(draft_id)
     if draft is None:
         return None
-    poi = POI(
-        id=f"custom:{uuid.uuid4()}",
-        name=name,
-        location=GeoPoint(
-            lat=lat if lat is not None else draft.start.lat,
-            lon=lon if lon is not None else draft.start.lon,
-        ),
-        facts=[],
+    location = GeoPoint(
+        lat=lat if lat is not None else draft.start.lat,
+        lon=lon if lon is not None else draft.start.lon,
     )
+    if source_ref:
+        poi = grounding_service.build_grounded_poi(source_ref, name=name, location=location)
+    else:
+        poi = POI(
+            id=f"custom:{uuid.uuid4()}",
+            name=name or "Nieuwe stop",
+            location=location,
+            facts=[],
+        )
     draft.stops.append(DraftStop(order=len(draft.stops) + 1, poi=poi))
     _measure(draft)
     drafts.put(draft)

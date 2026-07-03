@@ -48,7 +48,9 @@ def update_draft(draft_id: str, req: DraftUpdate) -> DraftTrail:
 
 @router.post("/{draft_id}/stops", response_model=DraftTrail, status_code=201)
 def create_custom_stop(draft_id: str, req: CustomStopRequest) -> DraftTrail:
-    draft = draft_service.add_custom_stop(draft_id, name=req.name, lat=req.lat, lon=req.lon)
+    draft = draft_service.add_custom_stop(
+        draft_id, name=req.name, lat=req.lat, lon=req.lon, source_ref=req.source_ref
+    )
     if draft is None:
         raise HTTPException(status_code=404, detail="Draft not found")
     return draft
