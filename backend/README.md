@@ -38,7 +38,7 @@ app/
   clients/
     overpass.py         OSM POI retrieval (Overpass API)
     wikidata.py         structured facts + enwiki title (Wikidata)
-    wikipedia.py        paraphrasable narrative summary (Wikipedia)
+    wikipedia.py        paraphrasable narrative summary (Wikipedia); `fetch_wikidata_qid` resolves a Wikipedia article title to its Wikidata QID
     osrm.py             walking-network routing (OSRM trip service)
   services/
     route_service.py    POI selection + loop building + distance/duration
@@ -46,6 +46,7 @@ app/
     content_service.py  RAG pipeline: grounded story + question list, cached
     answer_service.py   gating: evaluate primary or bonus; 3 attempts then reveal, Dutch feedback
     gamification_service.py  points/bonuses
+    grounding_service.py  resolve a creator-supplied `source_ref` (Wikipedia/Wikidata link or QID) to a grounded POI; degrades to a factless POI on any client failure
     llm/provider.py     provider-agnostic LLM (stub / claude_cli / ollama)
   cache/store.py        content store (POI × theme; memory/sqlite) + draft store (memory/file)
 tests/                  pytest suite
@@ -137,7 +138,7 @@ This is enforced in `_select_pois` in `app/services/route_service.py`.
 | `GET` | `/drafts/{id}` | Fetch a single draft trail |
 | `PUT` | `/drafts/{id}` | Update a draft trail (title, stops, status, etc.) |
 | `PUT` | `/drafts/{id}/stops/{order}` | Save a stop's story, questions list, and primary_question_index; returns 422 if the primary question is a gating type (A or D) with no stored answer |
-| `POST` | `/drafts/{id}/stops` | Add a custom (non-catalog) factless stop to a draft; body: `name` (string), optional `lat`/`lon` (floats, default to the draft start if omitted) |
+| `POST` | `/drafts/{id}/stops` | Add a custom stop to a draft; body: `name` (string, optional when `source_ref` is given), optional `lat`/`lon` (floats, default to the draft start if omitted), optional `source_ref` (Wikipedia/Wikidata link or bare QID — grounds the stop with Wikidata facts + Wikipedia background via `grounding_service`; degrades to a factless stop on any failure) |
 | `POST` | `/drafts/{id}/stops/{order}/generate` | RAG-generate a grounded story and candidate question from the selected facts; body: `fact_keys` (list of fact key strings to ground the generation) and `tone` (optional string, e.g. `"speels"`) |
 | `GET` | `/drafts/{id}/validation` | Pre-publish validation report: per-stop grounding checks, blocking/warning counts, and `can_publish` (true when `blocking == 0`) |
 | `POST` | `/drafts/{id}/publish` | Re-validates the draft; returns **409** if `blocking > 0`, otherwise sets `status=review` and returns the updated draft |
