@@ -1,9 +1,10 @@
 import { useState } from "react";
 
 interface CustomStopBody {
-  name: string;
+  name?: string;
   lat?: number;
   lon?: number;
+  source_ref?: string;
 }
 
 interface Props {
@@ -16,13 +17,18 @@ export function CustomStopForm({ start, onSubmit, onClose }: Props) {
   const [name, setName] = useState("");
   const [lat, setLat] = useState("");
   const [lon, setLon] = useState("");
+  const [sourceRef, setSourceRef] = useState("");
+
+  const canSubmit = name.trim() !== "" || sourceRef.trim() !== "";
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!name.trim()) return;
+    if (!canSubmit) return;
     const parsedLat = parseFloat(lat);
     const parsedLon = parseFloat(lon);
-    const body: CustomStopBody = { name: name.trim() };
+    const body: CustomStopBody = {};
+    if (name.trim()) body.name = name.trim();
+    if (sourceRef.trim()) body.source_ref = sourceRef.trim();
     if (!isNaN(parsedLat)) body.lat = parsedLat;
     if (!isNaN(parsedLon)) body.lon = parsedLon;
     onSubmit(body);
@@ -105,7 +111,6 @@ export function CustomStopForm({ start, onSubmit, onClose }: Props) {
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              required
               style={{
                 height: 38,
                 padding: "0 10px",
@@ -116,6 +121,24 @@ export function CustomStopForm({ start, onSubmit, onClose }: Props) {
                 background: "var(--tq-sand)",
                 outline: "none",
               }}
+            />
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+            <label
+              htmlFor="custom-stop-source"
+              style={{ font: "600 12px/1 var(--tq-sans)", color: "var(--tq-navy)" }}
+            >
+              Wikipedia/Wikidata-link of QID
+            </label>
+            <input
+              id="custom-stop-source"
+              aria-label="Wikipedia/Wikidata-link of QID"
+              type="text"
+              value={sourceRef}
+              onChange={(e) => setSourceRef(e.target.value)}
+              placeholder="https://nl.wikipedia.org/wiki/… of Q42"
+              style={{ height: 38, padding: "0 10px", border: "1px solid var(--tq-border)", borderRadius: 8, font: "400 14px/1 var(--tq-sans)", color: "var(--tq-ink)", background: "var(--tq-sand)", outline: "none" }}
             />
           </div>
 
@@ -176,15 +199,15 @@ export function CustomStopForm({ start, onSubmit, onClose }: Props) {
 
           <button
             type="submit"
-            disabled={!name.trim()}
+            disabled={!canSubmit}
             style={{
               height: 42,
               borderRadius: 10,
               border: "none",
-              background: name.trim() ? "#283a5e" : "#cbbfa6",
+              background: canSubmit ? "#283a5e" : "#cbbfa6",
               font: "600 14px/1 var(--tq-sans)",
               color: "#fff",
-              cursor: name.trim() ? "pointer" : "default",
+              cursor: canSubmit ? "pointer" : "default",
               marginTop: 4,
             }}
           >
