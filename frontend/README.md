@@ -89,8 +89,11 @@ src/
 │       └── StatTile
 │
 ├── api/
-│   ├── types.ts             Trail, Stop, Question, AnswerResult shapes
-│   │                        (mirrors backend schemas.py)
+│   ├── types.ts             Trail, Stop, DraftStop, Question, AnswerResult shapes
+│   │                        (mirrors backend schemas.py). Stop and DraftStop both
+│   │                        carry an `id: string` field — the shared stop_id
+│   │                        ("{poi_id}::{theme}") that identifies a stop's content
+│   │                        across drafts, trails, and the backend content store.
 │   ├── client.ts            fetch wrapper (throws on non-2xx)
 │   └── trails.ts            typed API calls: generateTrail, checkAnswer
 │
@@ -224,7 +227,7 @@ When all blocking issues are resolved (`can_publish: true`) the "Publiceer" butt
 
 ## Automated smoke results
 
-Run against branch `feat/creator-grounding`.
+Run against branch `feat/stop-identity`.
 
 ### Typecheck (`npm run typecheck`)
 

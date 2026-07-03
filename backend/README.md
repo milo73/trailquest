@@ -70,9 +70,31 @@ persists generated stops keyed by (POI × theme) with version, source, and revie
 status, so each (POI × theme) is generated **once** and reused across restarts and
 users — the key cost lever (PRD §9.3). Default `memory` is in-process.
 
+**Stop identity** — every stop is content-identified by a stable
+`stop_id = "{poi_id}::{theme}"` (computed by `stop_id_for` in
+`app/models/schemas.py`). The content store (`app/cache/store.py`) is keyed by
+`stop_id` and stores `StopContent` — the authoritative, order-free content for
+that (POI × theme) pair. `build_stop` in `app/services/content_service.py` always
+looks up and writes the store under `stop_id` and sets `Stop.id` to it.
+
 **Draft store** — `TRAILQUEST_DRAFT_STORE=file` (+ `TRAILQUEST_DRAFT_STORE_PATH`,
-default `drafts`) persists creator-studio drafts as JSON files in a directory across restarts. Default
-`memory` is in-process and drafts are lost on restart.
+default `drafts`) persists creator-studio drafts as JSON files in a directory
+across restarts. Default `memory` is in-process and drafts are lost on restart.
+
+Drafts are stored as lightweight `DraftRecord` objects that hold only
+`stop_refs: list[StopRef]` (each ref is a `stop_id` + `order`) rather than
+embedding full stop content. On every `get` or `list_drafts` call the draft store
+calls `_hydrate_draft`, which fetches each stop's content from the shared
+`content_cache`. This means **editing a stop's content in the shared store
+propagates automatically to every draft and trail that references that stop** —
+no per-draft content duplication.
+
+**Durability note** — restart-durable drafts require *both* stores to be
+persistent: `TRAILQUEST_DRAFT_STORE=file` (persists stop refs) **and**
+`TRAILQUEST_CONTENT_STORE=sqlite` (persists the stop content those refs point to).
+Using `draft_store=file` with the default `content_store=memory` means the draft
+records survive a restart but their content cannot be hydrated (the in-memory
+content store is empty after restart).
 
 **Walking routing** — `TRAILQUEST_ROUTING_PROVIDER=osrm` +
 `TRAILQUEST_OSRM_URL=<osrm-foot-server>` measures distance over the walking
