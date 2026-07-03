@@ -1,5 +1,5 @@
 from app.cache.store import content_cache
-from app.models.schemas import POI, Fact, GeoPoint, Source, SourceLicense, Theme
+from app.models.schemas import POI, Fact, GeoPoint, Source, SourceLicense, Theme, stop_id_for
 from app.services import content_service
 
 
@@ -32,4 +32,4 @@ def test_author_content_grounds_in_facts_and_builds_question():
 def test_author_content_does_not_touch_the_cache():
     content_cache.clear()
     content_service.author_content(_poi(), Theme.HISTORICAL)
-    assert content_cache.get("p1", Theme.HISTORICAL) is None  # no cache write
+    assert content_cache.get(stop_id_for("p1", Theme.HISTORICAL)) is None  # no cache write

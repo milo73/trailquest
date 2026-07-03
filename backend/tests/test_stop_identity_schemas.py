@@ -1,5 +1,14 @@
 from app.models.schemas import (
-    POI, DraftStop, GeoPoint, Question, QuestionType, Stop, StopContent, StopRef, Theme, stop_id_for,
+    POI,
+    DraftStop,
+    GeoPoint,
+    Question,
+    QuestionType,
+    Stop,
+    StopContent,
+    StopRef,
+    Theme,
+    stop_id_for,
 )
 
 

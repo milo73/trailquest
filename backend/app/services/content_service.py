@@ -18,7 +18,9 @@ from app.models.schemas import (
     QuestionType,
     Source,
     Stop,
+    StopContent,
     Theme,
+    stop_id_for,
 )
 from app.services.llm import get_llm_provider
 from app.services.llm.provider import StubProvider
@@ -70,15 +72,32 @@ def _build_questions(poi: POI) -> tuple[list[Question], int]:
     return questions, 0
 
 
+def _is_complete(c: StopContent) -> bool:
+    return (
+        bool(c.story and c.story.strip())
+        and len(c.questions) >= 1
+        and c.primary_question_index is not None
+    )
+
+
 def build_stop(poi: POI, theme: Theme, order: int) -> Stop:
     """Build (or fetch from the persistent store) the content for one stop.
 
     A cache hit means this (POI × theme) was generated before — by this or any
     prior process/user — so we never pay for the same generation twice (PRD §9.3).
     """
-    cached = content_cache.get(poi.id, theme)
-    if cached is not None:
-        return cached.model_copy(update={"order": order})
+    sid = stop_id_for(poi.id, theme)
+    cached = content_cache.get(sid)
+    if cached is not None and _is_complete(cached):
+        assert cached.story is not None
+        return Stop(
+            id=sid,
+            order=order,
+            poi=cached.poi,
+            story=cached.story,
+            questions=cached.questions,
+            primary_question_index=cached.primary_question_index or 0,
+        )
 
     questions, primary_index = _build_questions(poi)
     try:
@@ -94,6 +113,7 @@ def build_stop(poi: POI, theme: Theme, order: int) -> Stop:
             poi_name=poi.name, theme=theme, facts=poi.facts, background=poi.background
         )
         return Stop(
+            id=sid,
             order=order,
             poi=poi,
             story=story,
@@ -101,15 +121,18 @@ def build_stop(poi: POI, theme: Theme, order: int) -> Stop:
             primary_question_index=primary_index,
         )
 
-    stop = Stop(
+    content = StopContent(
+        poi=poi, story=story, questions=questions, primary_question_index=primary_index
+    )
+    content_cache.put(sid, content, source=f"{settings.llm_provider}:{settings.llm_model}")
+    return Stop(
+        id=sid,
         order=order,
         poi=poi,
         story=story,
         questions=questions,
         primary_question_index=primary_index,
     )
-    content_cache.put(poi.id, theme, stop, source=f"{settings.llm_provider}:{settings.llm_model}")
-    return stop
 
 
 def author_content(
