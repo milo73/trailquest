@@ -35,7 +35,7 @@ export interface Trail {
   attributions: string[];
 }
 
-export interface TrailRequest { start: GeoPoint; distance_km: number; theme: Theme; }
+export interface TrailRequest { start: GeoPoint; distance_km: number; theme: Theme; desired_stops?: number; }
 export interface AnswerRequest { stop_order: number; answer: string; attempt: number; question_index?: number | null; }
 export interface AnswerResult {
   correct: boolean;
@@ -74,6 +74,7 @@ export interface DraftCreate {
   distance_km?: number;
   theme?: Theme;
   from_concept?: boolean;
+  desired_stops?: number;
 }
 
 export interface DraftUpdate {

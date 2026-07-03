@@ -27,6 +27,7 @@ export function RouteEditor() {
   const [busy, setBusy] = useState(false);
   const [creating, setCreating] = useState(false);
   const [title, setTitle] = useState("");
+  const [desiredStops, setDesiredStops] = useState<string>("");
 
   // Seed title from draft, re-seed when draft id changes
   useEffect(() => {
@@ -116,11 +117,13 @@ export function RouteEditor() {
     if (creating) return;
     setCreating(true);
     try {
+      const parsed = parseInt(desiredStops, 10);
       await createDraft({
         start: draft?.start ?? { lat: 52.3812, lon: 4.6361 },
         distance_km: 5,
         theme: "historical",
         from_concept: true,
+        ...(Number.isFinite(parsed) ? { desired_stops: parsed } : {}),
       });
     } finally {
       setCreating(false);
@@ -161,6 +164,16 @@ export function RouteEditor() {
           >
             Publiceren
           </button>
+          <input
+            type="number"
+            min={2}
+            max={15}
+            aria-label="Aantal stops"
+            placeholder="auto"
+            value={desiredStops}
+            onChange={(e) => setDesiredStops(e.target.value)}
+            style={{ width: 72, height: 40, padding: "0 10px", borderRadius: 10, border: "1px solid #e0d5bf", background: "#fff", font: "600 13px/1 var(--tq-sans)", color: "#283a5e" }}
+          />
           <Button
             variant="primary"
             style={{ height: 40, fontSize: 13, borderRadius: 10 }}
