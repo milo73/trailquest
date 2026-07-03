@@ -132,6 +132,26 @@ class POI(BaseModel):
         return len(self.facts) > 0
 
 
+def stop_id_for(poi_id: str, theme: Theme) -> str:
+    """Stable content-identity key for a (POI × theme) stop."""
+    return f"{poi_id}::{theme.value}"
+
+
+class StopContent(BaseModel):
+    """Authoritative, order-free content of a stop (draft-shaped: content optional).
+    Stored once per ``stop_id`` and hydrated into a Stop/DraftStop per route."""
+
+    poi: POI
+    story: str | None = None
+    questions: list[Question] = Field(default_factory=list)
+    primary_question_index: int | None = None
+
+
+class StopRef(BaseModel):
+    stop_id: str
+    order: int
+
+
 class Stop(BaseModel):
     """One stop on a trail: a POI, its story, and one or more questions.
 
@@ -140,6 +160,7 @@ class Stop(BaseModel):
     are bonus questions — answerable, but they never unlock the next stop.
     """
 
+    id: str = ""
     order: int
     poi: POI
     story: str  # LLM-generated narrative, grounded in poi.facts
@@ -220,6 +241,7 @@ class DraftStop(BaseModel):
     """A stop on a draft trail. Unlike a player-facing ``Stop``, ``story`` and
     ``questions`` are optional — they are authored later in the studio."""
 
+    id: str = ""
     order: int
     poi: POI
     story: str | None = None

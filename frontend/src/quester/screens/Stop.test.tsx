@@ -11,7 +11,7 @@ const trail: Trail = {
   id: "t1", city: "Haarlem", theme: "historical", requested_distance_km: 5, actual_distance_km: 5,
   estimated_duration_min: 100, start: { lat: 52.38, lon: 4.63 }, attributions: [],
   stops: [{
-    order: 1, story: "Kijk omhoog.",
+    id: "p1::historical", order: 1, story: "Kijk omhoog.",
     questions: [{ type: "A", prompt: "Hoe hoog is de toren?", answer: "78 meter", hint: "13 x 6", gates: true }],
     primary_question_index: 0,
     poi: { id: "p1", name: "Sint-Bavokerk", location: { lat: 52.38, lon: 4.63 },
@@ -23,7 +23,7 @@ const trailWithBonus: Trail = {
   id: "t2", city: "Haarlem", theme: "historical", requested_distance_km: 5, actual_distance_km: 5,
   estimated_duration_min: 100, start: { lat: 52.38, lon: 4.63 }, attributions: [],
   stops: [{
-    order: 1, story: "Kijk omhoog.",
+    id: "p1::historical", order: 1, story: "Kijk omhoog.",
     questions: [
       { type: "A", prompt: "Hoe hoog is de toren?", answer: "78 meter", hint: "13 x 6", gates: true },
       { type: "C", prompt: "Wat vind je mooi aan dit gebouw?", answer: null, hint: null, gates: false },
