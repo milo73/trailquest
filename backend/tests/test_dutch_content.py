@@ -1,5 +1,5 @@
 from app.models.schemas import POI, Fact, GeoPoint, Source, SourceLicense, Theme
-from app.services.content_service import _build_question
+from app.services.content_service import _build_questions
 from app.services.llm.provider import StubProvider
 
 
@@ -19,7 +19,8 @@ def _poi(*, facts: bool) -> POI:
 
 
 def test_data_bound_question_is_dutch():
-    q = _build_question(_poi(facts=True))
+    questions, primary_index = _build_questions(_poi(facts=True))
+    q = questions[primary_index]
     assert q.type == "A"
     assert q.answer == "78"
     assert "Hoe hoog" in q.prompt  # Dutch template
@@ -27,8 +28,9 @@ def test_data_bound_question_is_dutch():
 
 
 def test_reflection_question_is_dutch():
-    q = _build_question(_poi(facts=False))
-    assert q.type == "C"
+    questions, _ = _build_questions(_poi(facts=False))
+    # When no data-bound facts, only the reflection question is generated
+    q = next(qq for qq in questions if qq.type == "C")
     assert "Kijk eens rond" in q.prompt
 
 

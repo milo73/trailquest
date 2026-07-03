@@ -41,30 +41,33 @@ _HINT_LABELS: dict[str, str] = {
 }
 
 
-def _build_question(poi: POI) -> Question:
-    """Generate a question for a POI.
-
-    Prefers a Type-A question built from a verifiable fact (so the answer is
-    known and the question may gate). Falls back to a Type-C reflection question
-    when no fact is usable — which always lets the player through.
-    """
+def _build_questions(poi: POI) -> tuple[list[Question], int]:
+    """Generate a stop's questions: one Type-A per data-bound fact (the primary
+    gates), plus a trailing Type-C reflection bonus. The list is never empty; the
+    primary is index 0 — the first data-bound question when any exist, else the
+    reflection (playable, gates-through)."""
+    questions: list[Question] = []
     for fact in poi.facts:
         template = _DATA_BOUND_TEMPLATES.get(fact.key)
         if template:
-            return Question(
-                type=QuestionType.DATA_BOUND,
-                prompt=template.format(name=poi.name),
-                answer=fact.value,
-                hint=(
-                    f"Tip: het gaat over de "
-                    f"{_HINT_LABELS.get(fact.key, fact.key.replace('_', ' '))}."
-                ),
+            questions.append(
+                Question(
+                    type=QuestionType.DATA_BOUND,
+                    prompt=template.format(name=poi.name),
+                    answer=fact.value,
+                    hint=(
+                        f"Tip: het gaat over de "
+                        f"{_HINT_LABELS.get(fact.key, fact.key.replace('_', ' '))}."
+                    ),
+                )
             )
-    # No data-bound fact available → open reflection (never gates on correctness).
-    return Question(
-        type=QuestionType.OPEN_REFLECTION,
-        prompt=f"Kijk eens rond bij {poi.name}. Wat denk je dat hier vroeger is gebeurd?",
+    questions.append(
+        Question(
+            type=QuestionType.OPEN_REFLECTION,
+            prompt=f"Kijk eens rond bij {poi.name}. Wat denk je dat hier vroeger is gebeurd?",
+        )
     )
+    return questions, 0
 
 
 def build_stop(poi: POI, theme: Theme, order: int) -> Stop:
@@ -77,7 +80,7 @@ def build_stop(poi: POI, theme: Theme, order: int) -> Stop:
     if cached is not None:
         return cached.model_copy(update={"order": order})
 
-    question = _build_question(poi)
+    questions, primary_index = _build_questions(poi)
     try:
         story = get_llm_provider().rephrase(
             poi_name=poi.name, theme=theme, facts=poi.facts, background=poi.background
@@ -90,22 +93,36 @@ def build_stop(poi: POI, theme: Theme, order: int) -> Stop:
         story = StubProvider().rephrase(
             poi_name=poi.name, theme=theme, facts=poi.facts, background=poi.background
         )
-        return Stop(order=order, poi=poi, story=story, question=question)
+        return Stop(
+            order=order,
+            poi=poi,
+            story=story,
+            questions=questions,
+            primary_question_index=primary_index,
+        )
 
-    stop = Stop(order=order, poi=poi, story=story, question=question)
+    stop = Stop(
+        order=order,
+        poi=poi,
+        story=story,
+        questions=questions,
+        primary_question_index=primary_index,
+    )
     content_cache.put(poi.id, theme, stop, source=f"{settings.llm_provider}:{settings.llm_model}")
     return stop
 
 
-def author_content(poi: POI, theme: Theme, tone: str | None = None) -> tuple[str, Question]:
-    """Generate authoring content (story + candidate question) for one POI.
+def author_content(
+    poi: POI, theme: Theme, tone: str | None = None
+) -> tuple[str, list[Question], int]:
+    """Generate authoring content (story + candidate questions) for one POI.
 
     Unlike :func:`build_stop` this never reads or writes the (POI × theme) cache —
     the studio author wants fresh output scoped to the facts they selected (the
     caller passes a POI carrying only those facts). Degrades to the stub on any
     provider failure (PRD §13).
     """
-    question = _build_question(poi)
+    questions, primary_index = _build_questions(poi)
     try:
         story = get_llm_provider().rephrase(
             poi_name=poi.name, theme=theme, facts=poi.facts, background=poi.background, tone=tone
@@ -114,7 +131,7 @@ def author_content(poi: POI, theme: Theme, tone: str | None = None) -> tuple[str
         story = StubProvider().rephrase(
             poi_name=poi.name, theme=theme, facts=poi.facts, background=poi.background, tone=tone
         )
-    return story, question
+    return story, questions, primary_index
 
 
 def collect_attributions(sources: list[Source]) -> list[str]:

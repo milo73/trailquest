@@ -103,7 +103,7 @@ src/
 │       ├── Configure.tsx    distance / theme picker → generateTrail
 │       ├── Preview.tsx      trail overview before starting
 │       ├── Navigate.tsx     "Ik ben er" arrival screen
-│       ├── Stop.tsx         story + question + answer + gating (3 attempts)
+│       ├── Stop.tsx         story + primary-gate question (3 attempts) + "Extra vragen" bonus section
 │       └── Finish.tsx       points tally + badges earned
 │
 └── studio/                  creator studio
@@ -113,8 +113,8 @@ src/
     └── screens/
         ├── Dashboard.tsx    trail cards + stats
         ├── RouteEditor.tsx  stop list + reorder controls
-        ├── StopEditor.tsx   stop detail — content, question type, gate toggle
-        │                    (Type B forces gate off per content-accuracy constraint)
+        ├── StopEditor.tsx   stop detail — content, multi-question list with a "primair (poort)" radio
+        │                    (only Type A/D may be primary; Type B forces gate off)
         └── Validation.tsx   pre-publish validation screen — server-computed report (per-stop grounding, blocking/warning counts, can_publish); "Publiceer" button is disabled while blocking > 0; on success sets the draft to `review`
 ```
 
@@ -123,7 +123,7 @@ src/
 | Feature | Wired to backend | Client-side / mock |
 |---|---|---|
 | Trail generation (`POST /trails`) | yes | — |
-| Answer checking (`POST /trails/{id}/stops/{idx}/answer`) | yes | — |
+| Answer checking (`POST /trails/{id}/answer`, optional `question_index`) | yes | — |
 | Points and badges | — | yes (`gamification.ts`) |
 | Star rating | — | yes (local state) |
 | Studio drafts (`POST/GET/PUT /drafts`) | yes | — |
@@ -135,19 +135,21 @@ src/
 
 ### Stop authoring
 
-The Stop editor (`StopEditor.tsx`) now loads, edits, and persists a stop's story and question via the FastAPI backend:
+The Stop editor (`StopEditor.tsx`) now loads, edits, and persists a stop's story and **multiple questions** via the FastAPI backend:
 
-- **Load/edit/save** — opening a stop populates the story and question fields from the draft stored on the server. Edits to either field autosave on blur via `PUT /drafts/{id}/stops/{order}` (body: `story`, `question`).
-- **Grounded generation ("Regenereer")** — checking one or more facts in the facts panel and optionally picking a tone, then clicking "Regenereer", calls `POST /drafts/{id}/stops/{order}/generate` (body: `fact_keys`, `tone`). The response fills the story and question fields with LLM-generated text grounded in the selected facts only — the LLM is not allowed to invent facts outside the supplied set.
+- **Load/edit/save** — opening a stop populates the story and question list from the draft stored on the server. Edits autosave on blur via `PUT /drafts/{id}/stops/{order}` (body: `story`, `questions`, `primary_question_index`).
+- **Multi-question list** — the editor renders one row per question. Each row has a type selector (A/B/C/D), prompt, answer (shown only for gating types A/D), and hint. A **"primair (poort)"** radio button marks which question gates the next stop; only Type A or D rows can be selected as primary (the radio is disabled for B and C). Additional bonus questions can be added with "Vraag toevoegen"; they are answered by the player but never gate progress.
+- **Grounded generation ("Regenereer")** — calls `POST /drafts/{id}/stops/{order}/generate` (body: `fact_keys`, `tone`). The response fills the story and question list; `primary_question_index` from the response is applied automatically.
 - **Tone selector** — a dropdown lets the author steer the register (`speels`, `zakelijk`, `kindvriendelijk`, `verhalend`). The selected tone is sent as the `tone` field in the generate request.
-- **422 guard** — saving a gating question (Type A or D) with no stored answer returns a 422 from the backend; the editor surfaces this as a validation error so the author cannot accidentally create an unverifiable gate.
+- **422 guard** — saving a gating primary question (Type A or D) with no stored answer returns a 422 from the backend; the editor surfaces this as an inline validation error.
 
 **Manual smoke** (requires `npm run dev` + backend running):
 
 - Open `http://localhost:5173/studio` → click a draft → click a stop row to open the Stop editor
 - Edit the story text; click outside the field (blur) → the change autosaves (reload confirms it persists)
-- Check one or more facts in the facts panel; pick a tone from the tone selector; click "Regenereer" → the story and question fields fill with grounded content
-- Reload the page — the generated story and question are retained on the server
+- Add a second question with "Vraag toevoegen"; set the first to Type A with an answer; select it as primary with the radio
+- Check one or more facts in the facts panel; pick a tone from the tone selector; click "Regenereer" → the story and question list fill with grounded content
+- Reload the page — the generated story and questions are retained on the server
 
 ---
 
@@ -216,7 +218,7 @@ When all blocking issues are resolved (`can_publish: true`) the "Publiceer" butt
 
 ## Automated smoke results
 
-Run against commit on branch `feat/studio-validation`.
+Run against commit on branch `feat/multi-question-stops`.
 
 ### Typecheck (`npm run typecheck`)
 
@@ -228,12 +230,13 @@ exit 0
 ### Tests (`npm test`)
 
 ```
-Test Files  21 passed (21)
-      Tests  63 passed (63)
-   Duration  ~1.3s
+Test Files  22 passed (22)
+      Tests  69 passed (69)
+   Duration  ~1.4s
 ```
 
 Test files:
+- `src/api/client.test.ts` (2)
 - `src/api/drafts.test.ts` (8)
 - `src/api/trails.test.ts` (2)
 - `src/quester/gamification.test.ts` (5)
@@ -242,7 +245,7 @@ Test files:
 - `src/quester/screens/Configure.test.tsx` (1)
 - `src/quester/screens/Navigate.test.tsx` (1)
 - `src/quester/screens/Preview.test.tsx` (1)
-- `src/quester/screens/Stop.test.tsx` (2)
+- `src/quester/screens/Stop.test.tsx` (3)
 - `src/design-system/primitives/Button.test.tsx` (1)
 - `src/design-system/primitives/MapCanvas.test.tsx` (1)
 - `src/design-system/primitives/SegmentedControl.test.tsx` (1)
@@ -262,11 +265,11 @@ Note: React Router v6 emits two "Future Flag Warning" lines during studio and pl
 
 ```
 vite v5.4.21 building for production...
-68 modules transformed.
+67 modules transformed.
 dist/index.html                   0.40 kB │ gzip:  0.27 kB
 dist/assets/index-DSq2xkZK.css    1.31 kB │ gzip:  0.64 kB
-dist/assets/index-uIPGfuYn.js   257.10 kB │ gzip: 73.58 kB
-built in 304ms
+dist/assets/index-239H-zH0.js   260.95 kB │ gzip: 74.46 kB
+built in 311ms
 exit 0
 ```
 
@@ -285,9 +288,10 @@ Run these manually after `npm run dev` with the backend running (see above).
 - [ ] Trail preview appears with real POI stops from the backend
 - [ ] Click "Start" to begin; map/navigate screen shows
 - [ ] Click "Ik ben er" to arrive at the first stop
-- [ ] Read the story and answer the question
-  - Correct answer: advances to next stop (or finish)
-  - Wrong answer: feedback shown; after 3 attempts the answer is revealed and progress continues (stops are not skippable — PRD §19)
+- [ ] Read the story and answer the primary gate question (labeled "RAADSEL")
+  - Correct answer: Dutch feedback ("Correct! Door naar de volgende stop.") and a "Volgende" button appear
+  - Wrong answer: Dutch feedback ("Net niet."); after 3 attempts the answer is revealed and progress continues (stops are not skippable — PRD §19)
+- [ ] If the stop has bonus questions, they appear in an "EXTRA VRAGEN" section below the primary gate — submitting them shows feedback but does not advance progress
 - [ ] Complete all stops; finish screen shows points earned and any badges
 
 ### Studio — existing trails

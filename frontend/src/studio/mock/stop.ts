@@ -38,12 +38,15 @@ export const MOCK_STOP: Stop = {
   },
   story:
     "Kijk eens omhoog. De toren van de Sint-Bavokerk schiet 78 meter de Haarlemse lucht in — eeuwenlang het eerste wat schippers op de Spaarne zagen opdoemen. Wat in 1370 als bescheiden kruiskerk begon, groeide in anderhalve eeuw uit tot dit gevaarte van Brabantse gotiek, afgerond rond 1520.",
-  question: {
-    type: "A",
-    prompt:
-      "Reken even mee: de toren is precies zo hoog als 13 op elkaar gestapelde grachtenpandjes van 6 m. Hoe hoog is de toren in meters?",
-    answer: "78 meter",
-    hint: "Denk aan de torenhoogte die in het verhaal staat.",
-    gates: true,
-  },
+  questions: [
+    {
+      type: "A",
+      prompt:
+        "Reken even mee: de toren is precies zo hoog als 13 op elkaar gestapelde grachtenpandjes van 6 m. Hoe hoog is de toren in meters?",
+      answer: "78 meter",
+      hint: "Denk aan de torenhoogte die in het verhaal staat.",
+      gates: true,
+    },
+  ],
+  primary_question_index: 0,
 };

@@ -29,7 +29,7 @@ def test_first_wrong_attempt_gives_hint_and_does_not_unlock() -> None:
     result = answer_service.evaluate(_data_question(), "10", attempt=1)
     assert not result.correct
     assert not result.unlocked_next
-    assert "Hint" in result.feedback
+    assert "Tip" in result.feedback
 
 
 def test_third_attempt_reveals_answer_and_unlocks() -> None:
@@ -50,3 +50,11 @@ def test_observe_count_is_honor_system() -> None:
     result = answer_service.evaluate(q, "4", attempt=1)
     assert result.unlocked_next  # never blocks
     assert result.correct
+
+
+def test_correct_feedback_is_dutch():
+    from app.models.schemas import Question, QuestionType
+    from app.services import answer_service
+
+    q = Question(type=QuestionType.DATA_BOUND, prompt="Hoe hoog?", answer="78")
+    assert "volgende stop" in answer_service.evaluate(q, "78", 1).feedback.lower()

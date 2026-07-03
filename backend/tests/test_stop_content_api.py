@@ -29,11 +29,15 @@ def test_put_stop_content_persists_and_generate_roundtrip():
     gen = client.post(f"/drafts/{draft_id}/stops/1/generate", json={"tone": "speels"})
     assert gen.status_code == 200
     body = gen.json()
-    assert body["story"] and body["question"]["type"]
+    assert body["story"] and body["questions"][0]["type"]
 
     put = client.put(
         f"/drafts/{draft_id}/stops/1",
-        json={"story": body["story"], "question": body["question"]},
+        json={
+            "story": body["story"],
+            "questions": body["questions"],
+            "primary_question_index": body["primary_question_index"],
+        },
     )
     assert put.status_code == 200
     assert client.get(f"/drafts/{draft_id}").json()["stops"][0]["story"] == body["story"]
@@ -44,7 +48,7 @@ def test_put_stop_content_invalid_gating_question_is_422():
     # Type A with no answer violates the Question gating invariant → 422
     r = client.put(
         f"/drafts/{draft_id}/stops/1",
-        json={"question": {"type": "A", "prompt": "Hoe hoog?"}},
+        json={"questions": [{"type": "A", "prompt": "Hoe hoog?"}], "primary_question_index": 0},
     )
     assert r.status_code == 422
 

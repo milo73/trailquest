@@ -66,7 +66,13 @@ def create(req: DraftCreate) -> DraftTrail:
             TrailRequest(start=req.start, distance_km=req.distance_km, theme=req.theme)
         )
         draft.stops = [
-            DraftStop(order=s.order, poi=s.poi, story=s.story, question=s.question)
+            DraftStop(
+                order=s.order,
+                poi=s.poi,
+                story=s.story,
+                questions=s.questions,
+                primary_question_index=s.primary_question_index,
+            )
             for s in trail.stops
         ]
     _measure(draft)
@@ -113,7 +119,12 @@ def update(draft_id: str, req: DraftUpdate) -> DraftTrail | None:
 
 
 def set_stop_content(
-    draft_id: str, order: int, *, story: str | None = None, question: Question | None = None
+    draft_id: str,
+    order: int,
+    *,
+    story: str | None = None,
+    questions: list[Question] | None = None,
+    primary_question_index: int | None = None,
 ) -> DraftTrail | None:
     draft = drafts.get(draft_id)
     if draft is None:
@@ -123,8 +134,9 @@ def set_stop_content(
         return None
     if story is not None:
         stop.story = story
-    if question is not None:
-        stop.question = question
+    if questions is not None:
+        stop.questions = questions
+        stop.primary_question_index = primary_question_index
     draft.attributions = _attributions(draft.stops)
     drafts.put(draft)
     return draft
@@ -132,7 +144,7 @@ def set_stop_content(
 
 def generate_stop_content(
     draft_id: str, order: int, *, fact_keys: list[str] | None = None, tone: str | None = None
-) -> tuple[str, Question] | None:
+) -> tuple[str, list[Question], int] | None:
     draft = drafts.get(draft_id)
     if draft is None:
         return None
@@ -173,7 +185,7 @@ def validate(draft: DraftTrail) -> ValidationResult:
         )
     )
 
-    complete = [s for s in stops if s.story and s.story.strip() and s.question is not None]
+    complete = [s for s in stops if s.story and s.story.strip()]
     checks.append(
         ValidationCheck(
             id="content",
@@ -190,6 +202,23 @@ def validate(draft: DraftTrail) -> ValidationResult:
             label="Grounding",
             detail=f"{len(grounded)} / {len(stops)} stops met verifieerbare feiten",
             status=CheckStatus.BLOCKING if len(grounded) < len(stops) else CheckStatus.OK,
+        )
+    )
+
+    def _has_gating_primary(s: DraftStop) -> bool:
+        return (
+            s.primary_question_index is not None
+            and 0 <= s.primary_question_index < len(s.questions)
+            and s.questions[s.primary_question_index].gates
+        )
+
+    gated = [s for s in stops if _has_gating_primary(s)]
+    checks.append(
+        ValidationCheck(
+            id="primary_gate",
+            label="Poortvraag",
+            detail=f"{len(gated)} / {len(stops)} stops hebben een geldige poortvraag",
+            status=CheckStatus.BLOCKING if len(gated) < len(stops) else CheckStatus.OK,
         )
     )
 

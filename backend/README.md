@@ -9,6 +9,24 @@ constraint (PRD §8): retrieved **ground truth** is kept separate from
 LLM-**generated** text, and questions are classified A/B/C/D by verifiability so
 only data-bound questions may gate progress.
 
+### Multi-question stops
+
+A `Stop` now holds a **list** of questions (`questions: list[Question]`) plus a
+`primary_question_index` (integer). The *primary* question is the gate: its type
+determines whether the player must answer correctly before the next stop unlocks
+(A/D gate on correctness; C gates-through; B is honor-system, never blocks). All
+other questions are *bonus* — players can answer them but they never unlock the
+next stop.
+
+`POST /trails/{id}/answer` accepts an optional `question_index` field in the
+request body (defaults to `primary_question_index` if omitted). Answer feedback is
+written in Dutch (`"Correct! Door naar de volgende stop."`, `"Net niet."`,
+`"Bedankt voor het delen — hier is geen fout antwoord."`, etc.).
+
+The pre-publish validation (`GET /drafts/{id}/validation`) includes a
+`primary_gate` check that blocks publish if any stop lacks a valid primary question
+of a gating type (A or D) with a stored answer.
+
 ## Layout
 
 ```
@@ -25,8 +43,8 @@ app/
   services/
     route_service.py    POI selection + loop building + distance/duration
     poi_service.py      POI + fact retrieval (seed or live OSM/Wikidata)
-    content_service.py  RAG pipeline: grounded story + typed question, cached
-    answer_service.py   gating: 3 attempts then reveal, honor system for Type B
+    content_service.py  RAG pipeline: grounded story + question list, cached
+    answer_service.py   gating: evaluate primary or bonus; 3 attempts then reveal, Dutch feedback
     gamification_service.py  points/bonuses
     llm/provider.py     provider-agnostic LLM (stub / claude_cli / ollama)
   cache/store.py        content store (POI × theme; memory/sqlite) + draft store (memory/file)
@@ -105,14 +123,14 @@ mypy app                        # type-check
 | `GET` | `/health` | Liveness check |
 | `POST` | `/trails` | Generate a full trail (route + content) |
 | `GET` | `/trails/{id}` | Fetch a persisted generated trail |
-| `POST` | `/trails/{id}/stops/{idx}/answer` | Check answer for a stop (gating) |
+| `POST` | `/trails/{id}/answer` | Check answer for a stop; body: `stop_order`, `answer`, `attempt`, optional `question_index` (defaults to primary) |
 | `GET` | `/pois` | List candidate POIs near a location (query params: `lat`, `lon`, `distance_km`) |
 | `POST` | `/routes/measure` | Compute walking distance/duration for an ordered list of coordinates |
 | `POST` | `/drafts` | Create a new draft trail |
 | `GET` | `/drafts` | List all draft trails |
 | `GET` | `/drafts/{id}` | Fetch a single draft trail |
 | `PUT` | `/drafts/{id}` | Update a draft trail (title, stops, status, etc.) |
-| `PUT` | `/drafts/{id}/stops/{order}` | Save a stop's story and question; returns 422 if the question is a gating type (A or D) with no stored answer |
+| `PUT` | `/drafts/{id}/stops/{order}` | Save a stop's story, questions list, and primary_question_index; returns 422 if the primary question is a gating type (A or D) with no stored answer |
 | `POST` | `/drafts/{id}/stops` | Add a custom (non-catalog) factless stop to a draft; body: `name` (string), optional `lat`/`lon` (floats, default to the draft start if omitted) |
 | `POST` | `/drafts/{id}/stops/{order}/generate` | RAG-generate a grounded story and candidate question from the selected facts; body: `fact_keys` (list of fact key strings to ground the generation) and `tone` (optional string, e.g. `"speels"`) |
 | `GET` | `/drafts/{id}/validation` | Pre-publish validation report: per-stop grounding checks, blocking/warning counts, and `can_publish` (true when `blocking == 0`) |

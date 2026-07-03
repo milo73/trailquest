@@ -10,7 +10,7 @@ const poi = (id: string, name: string): POI => ({ id, name, location: { lat: 52.
 const draft = (stops: { order: number; poi: POI }[]): DraftTrail => ({
   id: "d1", title: "Nieuwe tocht", city: "Haarlem", theme: "historical",
   start: { lat: 52.38, lon: 4.63 }, requested_distance_km: 5, actual_distance_km: 1.2,
-  estimated_duration_min: 20, stops, status: "concept", attributions: [],
+  estimated_duration_min: 20, stops: stops.map((s) => ({ ...s, questions: [] })), status: "concept", attributions: [],
 });
 
 beforeEach(() => localStorage.clear());

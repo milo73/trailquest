@@ -9,7 +9,7 @@ const trail: Trail = {
   id: "t1", city: "Haarlem", theme: "historical", requested_distance_km: 5, actual_distance_km: 5.2,
   estimated_duration_min: 105, start: { lat: 52.38, lon: 4.63 }, attributions: [],
   stops: [1, 2, 3, 4].map((order) => ({
-    order, story: "s", question: { type: "C" as const, prompt: "?", gates: false },
+    order, story: "s", questions: [{ type: "C" as const, prompt: "?", gates: false }], primary_question_index: 0,
     poi: { id: `p${order}`, name: `POI ${order}`, location: { lat: 52.38, lon: 4.63 }, facts: [] },
   })),
 };

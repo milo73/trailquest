@@ -29,9 +29,11 @@ def _draft_with_one_stop():
 def test_set_stop_content_persists_story_and_question():
     d = _draft_with_one_stop()
     q = Question(type=QuestionType.OPEN_REFLECTION, prompt="Wat denk je?")
-    updated = draft_service.set_stop_content(d.id, 1, story="Een mooi verhaal.", question=q)
+    updated = draft_service.set_stop_content(
+        d.id, 1, story="Een mooi verhaal.", questions=[q], primary_question_index=0
+    )
     assert updated.stops[0].story == "Een mooi verhaal."
-    assert updated.stops[0].question.prompt == "Wat denk je?"
+    assert updated.stops[0].questions[0].prompt == "Wat denk je?"
     # persisted
     assert draft_service.get(d.id).stops[0].story == "Een mooi verhaal."
 
@@ -46,11 +48,11 @@ def test_generate_stop_content_filters_by_fact_keys():
     d = _draft_with_one_stop()
     stop_poi = draft_service.get(d.id).stops[0].poi
     # generate with an empty fact selection → story must not contain any fact value
-    story, question = draft_service.generate_stop_content(d.id, 1, fact_keys=[])
+    story, questions, primary_index = draft_service.generate_stop_content(d.id, 1, fact_keys=[])
     for fact in stop_poi.facts:
         assert fact.value not in story
     # generate with all facts → at least one fact value appears (stub echoes facts)
-    story_all, _ = draft_service.generate_stop_content(d.id, 1, fact_keys=None)
+    story_all, _, _idx = draft_service.generate_stop_content(d.id, 1, fact_keys=None)
     assert any(f.value in story_all for f in stop_poi.facts)
 
 

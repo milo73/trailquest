@@ -22,7 +22,7 @@ def test_generate_trail_is_a_loop_with_grounded_stops(client: TestClient) -> Non
     # Every stop carries a story and a question.
     for stop in trail["stops"]:
         assert stop["story"]
-        assert stop["question"]["prompt"]
+        assert stop["questions"][stop["primary_question_index"]]["prompt"]
     # Fact-less POIs are skipped (prefer no stop over a wrong stop).
     names = [s["poi"]["name"] for s in trail["stops"]]
     assert "Grote Markt" not in names
@@ -33,8 +33,8 @@ def test_generate_trail_is_a_loop_with_grounded_stops(client: TestClient) -> Non
 def test_generated_question_from_fact_can_be_answered(client: TestClient) -> None:
     trail = client.post("/trails", json={"start": HAARLEM, "distance_km": 3}).json()
     # Find a data-bound (gating) stop and answer it correctly.
-    gating = next(s for s in trail["stops"] if s["question"]["gates"])
-    answer = gating["question"]["answer"]
+    gating = next(s for s in trail["stops"] if s["questions"][s["primary_question_index"]]["gates"])
+    answer = gating["questions"][gating["primary_question_index"]]["answer"]
     resp = client.post(
         f"/trails/{trail['id']}/answer",
         json={"stop_order": gating["order"], "answer": answer, "attempt": 1},

@@ -14,7 +14,8 @@ def _poi() -> POI:
 def test_draft_stop_content_is_optional():
     stop = DraftStop(order=1, poi=_poi())
     assert stop.story is None
-    assert stop.question is None
+    assert stop.questions == []
+    assert stop.primary_question_index is None
 
 
 def test_draft_trail_defaults_to_concept():
