@@ -15,6 +15,7 @@ import httpx
 from app.clients import ClientError
 
 _SUMMARY_API = "https://{lang}.wikipedia.org/api/rest_v1/page/summary/{title}"
+_ACTION_API = "https://{lang}.wikipedia.org/w/api.php"
 _HEADERS = {"User-Agent": "TrailQuest/0.1 (+https://github.com/milo73/trailquest)"}
 
 
@@ -22,6 +23,35 @@ _HEADERS = {"User-Agent": "TrailQuest/0.1 (+https://github.com/milo73/trailquest
 class WikipediaSummary:
     extract: str  # plain-text summary, to be paraphrased
     url: str  # article URL, for attribution
+
+
+def fetch_wikidata_qid(title: str, lang: str = "en", timeout: float = 30.0) -> str | None:
+    """Resolve a Wikipedia article title to its Wikidata QID (pageprops.wikibase_item)."""
+    try:
+        resp = httpx.get(
+            _ACTION_API.format(lang=lang),
+            params={
+                "action": "query",
+                "prop": "pageprops",
+                "ppprop": "wikibase_item",
+                "redirects": "1",
+                "titles": title,
+                "format": "json",
+            },
+            timeout=timeout,
+            headers=_HEADERS,
+            follow_redirects=True,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+    except (httpx.HTTPError, ValueError) as exc:
+        raise ClientError(f"Wikipedia QID lookup failed for {title!r}: {exc}") from exc
+
+    for page in data.get("query", {}).get("pages", {}).values():
+        qid = page.get("pageprops", {}).get("wikibase_item")
+        if qid:
+            return str(qid)
+    return None
 
 
 def fetch_summary(title: str, lang: str = "en", timeout: float = 30.0) -> WikipediaSummary | None:

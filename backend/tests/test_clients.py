@@ -132,6 +132,24 @@ def test_wikipedia_summary_none_when_empty(monkeypatch: pytest.MonkeyPatch) -> N
     assert wikipedia.fetch_summary("Nothing") is None
 
 
+def test_wikipedia_fetch_qid_returns_wikibase_item(monkeypatch: pytest.MonkeyPatch) -> None:
+    payload = {"query": {"pages": {"123": {"pageprops": {"wikibase_item": "Q42"}}}}}
+    monkeypatch.setattr(wikipedia.httpx, "get", lambda *a, **k: _FakeResponse(payload))
+    assert wikipedia.fetch_wikidata_qid("Grote Kerk", "nl") == "Q42"
+
+
+def test_wikipedia_fetch_qid_none_when_absent(monkeypatch: pytest.MonkeyPatch) -> None:
+    payload = {"query": {"pages": {"123": {"title": "X"}}}}
+    monkeypatch.setattr(wikipedia.httpx, "get", lambda *a, **k: _FakeResponse(payload))
+    assert wikipedia.fetch_wikidata_qid("X") is None
+
+
+def test_wikipedia_fetch_qid_raises_on_http_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(wikipedia.httpx, "get", lambda *a, **k: _FakeResponse({}, status=500))
+    with pytest.raises(ClientError):
+        wikipedia.fetch_wikidata_qid("X")
+
+
 def test_osrm_orders_loop_and_reports_distance(monkeypatch: pytest.MonkeyPatch) -> None:
     # start=0, then two stops; OSRM says visit input index 2 before index 1.
     payload = {
