@@ -56,3 +56,43 @@ def test_edit_in_one_draft_propagates_to_another_sharing_the_stop():
 
     b = store.get("B")
     assert b.stops[0].story == "nieuw verhaal"  # edit propagated via the shared stop store
+
+
+def _empty_draft(draft_id: str, poi: POI) -> DraftTrail:
+    """Draft with a bare (no story, no questions) stop for the given POI."""
+    return DraftTrail(
+        id=draft_id,
+        title="t",
+        city="Haarlem",
+        theme=Theme.HISTORICAL,
+        start=GeoPoint(lat=52.0, lon=4.0),
+        requested_distance_km=5,
+        actual_distance_km=1,
+        estimated_duration_min=10,
+        stops=[DraftStop(order=1, poi=poi)],
+    )
+
+
+def test_empty_draft_does_not_downgrade_authored_content():
+    """A bare stop in draft B must not clobber authored content from draft A."""
+    content_cache.clear()
+    store = InMemoryDraftStore()
+    poi = POI(id="grote-markt", name="Grote Markt", location=GeoPoint(lat=52.0, lon=4.0))
+
+    # Draft A authors the stop with real content.
+    store.put(_draft("A", poi))
+
+    # Draft B adds the SAME POI but with an empty stop (no story, no questions).
+    store.put(_empty_draft("B", poi))
+
+    # Draft A must still have its authored story — B must not have clobbered it.
+    a = store.get("A")
+    assert a is not None
+    assert a.stops[0].story == "oud verhaal", "authored content was downgraded by empty stop"
+    assert len(a.stops[0].questions) == 1
+
+    # Draft B, on read, inherits the authored content from the shared stop store.
+    b = store.get("B")
+    assert b is not None
+    assert b.stops[0].story == "oud verhaal", "draft B should inherit authored content"
+    assert len(b.stops[0].questions) == 1

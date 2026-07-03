@@ -266,8 +266,21 @@ class DraftRecord(BaseModel):
     stop_refs: list[StopRef]
 
 
+def _has_content(c: StopContent) -> bool:
+    """Return True if *c* carries real authored content (story or questions)."""
+    return bool(c.story and c.story.strip()) or len(c.questions) > 0
+
+
 def _normalize_draft(draft: DraftTrail) -> DraftRecord:
-    """Extract stop content into ``content_cache`` and return a ref-only record."""
+    """Extract stop content into ``content_cache`` and return a ref-only record.
+
+    Write rule: a freshly-added/empty stop must NEVER overwrite existing authored
+    content for the same stop_id.  Only write when:
+    - there is no existing entry (first time this POI×theme is seen), OR
+    - the incoming content differs AND is non-empty (has a story or ≥1 question).
+    This prevents a bare DraftStop (no story/questions) from silently clobbering
+    content authored by another draft that shares the same stop_id.
+    """
     refs: list[StopRef] = []
     for s in draft.stops:
         sid = stop_id_for(s.poi.id, draft.theme)
@@ -279,7 +292,13 @@ def _normalize_draft(draft: DraftTrail) -> DraftRecord:
             primary_question_index=s.primary_question_index,
         )
         latest = content_cache.get(sid)
-        if latest != content:  # only version on change
+        if latest is None:
+            # First time this stop_id is seen — store unconditionally (even if
+            # empty) so the ref hydrates and POI metadata is available.
+            content_cache.put(sid, content, source="draft")
+        elif content != latest and _has_content(content):
+            # Only upgrade: a non-empty edit propagates; empty/bare stops never
+            # downgrade existing authored content.
             content_cache.put(sid, content, source="draft")
         refs.append(StopRef(stop_id=sid, order=s.order))
     return DraftRecord(
@@ -303,6 +322,8 @@ def _hydrate_draft(record: DraftRecord) -> DraftTrail:
     for ref in record.stop_refs:
         content = content_cache.get(ref.stop_id)
         if content is None:
+            # Only fires under FileDraftStore + in-memory-content on restart
+            # (see README durability note on store coupling).
             continue
         stops.append(
             DraftStop(
