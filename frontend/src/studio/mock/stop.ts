@@ -1,6 +1,7 @@
 import type { Stop } from "../../api/types";
 
 export const MOCK_STOP: Stop = {
+  id: "sint-bavokerk-haarlem::historical",
   order: 4,
   poi: {
     id: "sint-bavokerk-haarlem",

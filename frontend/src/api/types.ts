@@ -22,7 +22,7 @@ export interface POI {
   background?: string | null;
   background_source?: Source | null;
 }
-export interface Stop { order: number; poi: POI; story: string; questions: Question[]; primary_question_index: number; }
+export interface Stop { id: string; order: number; poi: POI; story: string; questions: Question[]; primary_question_index: number; }
 export interface Trail {
   id: string;
   city: string;
@@ -47,6 +47,7 @@ export interface AnswerResult {
 export type DraftStatus = "concept" | "review" | "published";
 
 export interface DraftStop {
+  id: string;
   order: number;
   poi: POI;
   story?: string | null;

@@ -65,7 +65,7 @@ export function DraftProvider({ children }: { children: React.ReactNode }) {
       },
       addStop: async (poi) => {
         if (!draft) return;
-        const next = { ...draft, stops: renumber([...draft.stops, { order: 0, poi, questions: [] }]) };
+        const next = { ...draft, stops: renumber([...draft.stops, { id: "", order: 0, poi, questions: [] }]) };
         await save(next);
       },
       removeStop: async (order) => {
