@@ -302,9 +302,10 @@ class StopGenerateResult(BaseModel):
 
 
 class CustomStopRequest(BaseModel):
-    name: str
+    name: str | None = None
     lat: float | None = None
     lon: float | None = None
+    source_ref: str | None = None
 
 
 class CheckStatus(StrEnum):

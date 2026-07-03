@@ -180,7 +180,7 @@ The route and stop editors have been extended with the following capabilities:
 
 - **Inline rename** — the draft title in the Route editor is an editable field; changes autosave on blur via `PUT /drafts/{id}` (no separate save button required).
 - **Clickable logo** — the TrailQuest logo in the studio shell is a link back to `/studio` (the dashboard).
-- **Add-stop chooser** — clicking "+ Stop toevoegen" opens a two-tab chooser: a catalog picker that loads real Haarlem POIs from `GET /pois` (with loading and error states), and a custom-stop form (fields: name, optional lat/lon) that calls `POST /drafts/{id}/stops`.
+- **Add-stop chooser** — clicking "+ Stop toevoegen" opens a two-tab chooser: a catalog picker that loads real Haarlem POIs from `GET /pois` (with loading and error states), and a custom-stop form (fields: name [optional when a Wikipedia/Wikidata link or QID is supplied], "Wikipedia/Wikidata-link of QID" (`source_ref`), optional lat/lon) that calls `POST /drafts/{id}/stops`. When `source_ref` resolves successfully, the backend grounds the stop with real Wikidata facts and a Wikipedia background; the Stop editor's FEITEN panel then shows those real facts. Grounding degrades gracefully — if the reference cannot be resolved, a factless stop is added instead.
 - **Stop editor — prev/next pagination** — arrow buttons in the Stop editor navigate between stops in the current draft without returning to the Route editor.
 - **Stop editor — "Terug naar route"** — a back link navigates to `/studio/route` with the current draft loaded.
 - **Stop editor — Regenereer error feedback** — if `POST /drafts/{id}/stops/{order}/generate` fails, an inline error message is shown rather than silently failing.
@@ -190,7 +190,7 @@ The route and stop editors have been extended with the following capabilities:
 
 - Open `http://localhost:5173/studio` → open a draft → rename the title in-place and click outside → the name updates (autosaved).
 - Click "+ Stop toevoegen" → select a POI from the catalog picker → confirm it appears in the stop list.
-- Open the chooser again → switch to the custom-stop tab → enter a name and optional coordinates → add the stop → confirm it appears in the list.
+- Open the chooser again → switch to the custom-stop tab → enter a name and optional coordinates → add the stop → confirm it appears in the list. Optionally enter a Wikipedia URL or Wikidata QID in the "Wikipedia/Wikidata-link of QID" field (name then becomes optional); if the reference resolves, the Stop editor's FEITEN panel shows real facts from Wikidata.
 - Click a stop row → Stop editor opens; use the prev/next arrows to page through stops.
 - Click "Terug naar route" → the Route editor reloads with the correct draft.
 - Navigate directly to `http://localhost:5173/studio/stop` (hard reload) → confirm the editor restores the previously active stop.
@@ -224,7 +224,7 @@ When all blocking issues are resolved (`can_publish: true`) the "Publiceer" butt
 
 ## Automated smoke results
 
-Run against commit on branch `feat/multi-question-stops`.
+Run against branch `feat/creator-grounding`.
 
 ### Typecheck (`npm run typecheck`)
 
@@ -236,9 +236,9 @@ exit 0
 ### Tests (`npm test`)
 
 ```
-Test Files  22 passed (22)
-      Tests  69 passed (69)
-   Duration  ~1.4s
+Test Files  23 passed (23)
+      Tests  71 passed (71)
+   Duration  ~1.6s
 ```
 
 Test files:
@@ -256,11 +256,12 @@ Test files:
 - `src/design-system/primitives/MapCanvas.test.tsx` (1)
 - `src/design-system/primitives/SegmentedControl.test.tsx` (1)
 - `src/design-system/primitives/SourceBadge.test.tsx` (2)
+- `src/studio/components/CustomStopForm.test.tsx` (1)
 - `src/studio/components/PoiPicker.test.tsx` (3)
 - `src/studio/draftStore.test.tsx` (8)
 - `src/studio/screens/Dashboard.test.tsx` (3)
-- `src/studio/screens/RouteEditor.test.tsx` (5)
-- `src/studio/screens/StopEditor.test.tsx` (11)
+- `src/studio/screens/RouteEditor.test.tsx` (6)
+- `src/studio/screens/StopEditor.test.tsx` (14)
 - `src/studio/screens/Validation.test.tsx` (2)
 - `src/studio/StudioChrome.test.tsx` (1)
 - `src/App.test.tsx` (1)
@@ -274,8 +275,8 @@ vite v5.4.21 building for production...
 67 modules transformed.
 dist/index.html                   0.40 kB │ gzip:  0.27 kB
 dist/assets/index-DSq2xkZK.css    1.31 kB │ gzip:  0.64 kB
-dist/assets/index-239H-zH0.js   260.95 kB │ gzip: 74.46 kB
-built in 311ms
+dist/assets/index-1BqYj-Wk.js   261.97 kB │ gzip: 74.70 kB
+built in 313ms
 exit 0
 ```
 

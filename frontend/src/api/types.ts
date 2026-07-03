@@ -107,9 +107,10 @@ export interface StopGenerateResult {
 }
 
 export interface CustomStopRequest {
-  name: string;
+  name?: string;
   lat?: number;
   lon?: number;
+  source_ref?: string;
 }
 
 export type CheckStatus = "ok" | "warning" | "blocking";
