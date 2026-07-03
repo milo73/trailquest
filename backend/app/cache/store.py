@@ -21,8 +21,20 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
+from pydantic import BaseModel
+
 from app.config import settings
-from app.models.schemas import DraftTrail, StopContent, Theme, Trail, stop_id_for
+from app.models.schemas import (
+    DraftStatus,
+    DraftStop,
+    DraftTrail,
+    GeoPoint,
+    StopContent,
+    StopRef,
+    Theme,
+    Trail,
+    stop_id_for,
+)
 
 # Review status of a cached entry (PRD §8.3: AI + sampling). MVP serves
 # unreviewed content; the curation layer flips entries to approved/rejected.
@@ -234,6 +246,89 @@ class ActiveTrailStore:
 active_trails = ActiveTrailStore()
 
 
+class DraftRecord(BaseModel):
+    """Lightweight draft metadata that stores stop refs instead of embedded content.
+
+    Each stop's content is stored in the shared ``content_cache`` keyed by
+    ``stop_id``, so edits to a stop propagate to every draft that references it.
+    """
+
+    id: str
+    title: str
+    city: str
+    theme: Theme
+    start: GeoPoint
+    requested_distance_km: float
+    actual_distance_km: float
+    estimated_duration_min: int
+    status: DraftStatus
+    attributions: list[str]
+    stop_refs: list[StopRef]
+
+
+def _normalize_draft(draft: DraftTrail) -> DraftRecord:
+    """Extract stop content into ``content_cache`` and return a ref-only record."""
+    refs: list[StopRef] = []
+    for s in draft.stops:
+        sid = stop_id_for(s.poi.id, draft.theme)
+        s.id = sid  # response-ready id
+        content = StopContent(
+            poi=s.poi,
+            story=s.story,
+            questions=s.questions,
+            primary_question_index=s.primary_question_index,
+        )
+        latest = content_cache.get(sid)
+        if latest != content:  # only version on change
+            content_cache.put(sid, content, source="draft")
+        refs.append(StopRef(stop_id=sid, order=s.order))
+    return DraftRecord(
+        id=draft.id,
+        title=draft.title,
+        city=draft.city,
+        theme=draft.theme,
+        start=draft.start,
+        requested_distance_km=draft.requested_distance_km,
+        actual_distance_km=draft.actual_distance_km,
+        estimated_duration_min=draft.estimated_duration_min,
+        status=draft.status,
+        attributions=draft.attributions,
+        stop_refs=refs,
+    )
+
+
+def _hydrate_draft(record: DraftRecord) -> DraftTrail:
+    """Reconstruct a ``DraftTrail`` by fetching each stop's content from the cache."""
+    stops: list[DraftStop] = []
+    for ref in record.stop_refs:
+        content = content_cache.get(ref.stop_id)
+        if content is None:
+            continue
+        stops.append(
+            DraftStop(
+                id=ref.stop_id,
+                order=ref.order,
+                poi=content.poi,
+                story=content.story,
+                questions=content.questions,
+                primary_question_index=content.primary_question_index,
+            )
+        )
+    return DraftTrail(
+        id=record.id,
+        title=record.title,
+        city=record.city,
+        theme=record.theme,
+        start=record.start,
+        requested_distance_km=record.requested_distance_km,
+        actual_distance_km=record.actual_distance_km,
+        estimated_duration_min=record.estimated_duration_min,
+        status=record.status,
+        attributions=record.attributions,
+        stops=stops,
+    )
+
+
 class DraftStore(ABC):
     """Registry of creator draft trails."""
 
@@ -252,23 +347,28 @@ class DraftStore(ABC):
 
 class InMemoryDraftStore(DraftStore):
     def __init__(self) -> None:
-        self._drafts: dict[str, DraftTrail] = {}
+        self._records: dict[str, DraftRecord] = {}
 
     def put(self, draft: DraftTrail) -> None:
-        self._drafts[draft.id] = draft
+        self._records[draft.id] = _normalize_draft(draft)
 
     def get(self, draft_id: str) -> DraftTrail | None:
-        return self._drafts.get(draft_id)
+        rec = self._records.get(draft_id)
+        return _hydrate_draft(rec) if rec is not None else None
 
     def list_drafts(self) -> list[DraftTrail]:
-        return list(self._drafts.values())
+        return [_hydrate_draft(rec) for rec in self._records.values()]
 
     def clear(self) -> None:
-        self._drafts.clear()
+        self._records.clear()
 
 
 class FileDraftStore(DraftStore):
-    """Persist each draft as ``<id>.json`` under a directory (survives restarts)."""
+    """Persist each draft as ``<id>.json`` under a directory (survives restarts).
+
+    Writes a ``DraftRecord`` (refs-only) so stop content is never duplicated;
+    hydration reads from the shared ``content_cache``.
+    """
 
     def __init__(self, dir_path: str) -> None:
         self._dir = Path(dir_path)
@@ -278,18 +378,21 @@ class FileDraftStore(DraftStore):
         return self._dir / f"{Path(draft_id).name}.json"  # .name guards path traversal
 
     def put(self, draft: DraftTrail) -> None:
-        self._path(draft.id).write_text(draft.model_dump_json(indent=2), encoding="utf-8")
+        rec = _normalize_draft(draft)
+        self._path(draft.id).write_text(rec.model_dump_json(indent=2), encoding="utf-8")
 
     def get(self, draft_id: str) -> DraftTrail | None:
         path = self._path(draft_id)
         if not path.exists():
             return None
-        return DraftTrail.model_validate_json(path.read_text(encoding="utf-8"))
+        rec = DraftRecord.model_validate_json(path.read_text(encoding="utf-8"))
+        return _hydrate_draft(rec)
 
     def list_drafts(self) -> list[DraftTrail]:
         out: list[DraftTrail] = []
         for f in sorted(self._dir.glob("*.json")):
-            out.append(DraftTrail.model_validate_json(f.read_text(encoding="utf-8")))
+            rec = DraftRecord.model_validate_json(f.read_text(encoding="utf-8"))
+            out.append(_hydrate_draft(rec))
         return out
 
     def clear(self) -> None:
