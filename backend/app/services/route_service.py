@@ -95,20 +95,24 @@ def _order_and_measure(start: GeoPoint, selected: list[POI]) -> tuple[list[POI],
     return ordered, round(_loop_distance_km(start, ordered), 2)
 
 
-def _select_pois(candidates: list[POI], distance_km: float) -> list[POI]:
-    """Pick POIs with verifiable facts, roughly one stop per kilometre.
+def _select_pois(
+    candidates: list[POI], distance_km: float, desired_stops: int | None = None
+) -> list[POI]:
+    """Pick POIs with verifiable facts. Uses ``desired_stops`` when given, else
+    roughly one stop per kilometre; clamps to the number of grounded POIs.
 
     Prefer no stop over a wrong stop: fact-less POIs are dropped (PRD §8.3, §13).
     """
     with_facts = [p for p in candidates if p.has_verifiable_facts]
-    target_stops = max(2, round(distance_km))
-    return with_facts[:target_stops]
+    target = desired_stops if desired_stops is not None else max(2, round(distance_km))
+    target = max(2, min(target, len(with_facts)))
+    return with_facts[:target]
 
 
 def generate_trail(req: TrailRequest) -> Trail:
     """Generate a full trail for the request (the thin end-to-end vertical)."""
     candidates = poi_service.candidates(req.start, req.distance_km)
-    selected = _select_pois(candidates, req.distance_km)
+    selected = _select_pois(candidates, req.distance_km, req.desired_stops)
     ordered, actual_km = _order_and_measure(req.start, selected)
 
     stops = [

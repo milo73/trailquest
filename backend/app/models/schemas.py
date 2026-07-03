@@ -186,6 +186,7 @@ class TrailRequest(BaseModel):
     start: GeoPoint
     distance_km: float = Field(ge=1, le=25)  # min/max bounds per PRD §7.2
     theme: Theme = Theme.MIXED
+    desired_stops: int | None = Field(default=None, ge=2, le=15)
 
 
 # Maximum wrong attempts before the answer is revealed and the trail continues.
@@ -261,6 +262,7 @@ class DraftCreate(BaseModel):
     distance_km: float = Field(default=5, ge=1, le=25)
     theme: Theme = Theme.MIXED
     from_concept: bool = False
+    desired_stops: int | None = Field(default=None, ge=2, le=15)
 
 
 class DraftUpdate(BaseModel):

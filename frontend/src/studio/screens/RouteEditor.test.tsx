@@ -106,6 +106,21 @@ test("editing the route title and blurring renames the draft", async () => {
   });
 });
 
+test("Genereer concept passes desired_stops when the aantal-stops input is set", async () => {
+  const seeded = draft([]);
+  const fetchMock = vi.fn().mockImplementation(() =>
+    Promise.resolve(new Response(JSON.stringify(seeded), { status: 201 })),
+  );
+  vi.stubGlobal("fetch", fetchMock);
+  render(<MemoryRouter><DraftProvider><Harness seed={seeded} /></DraftProvider></MemoryRouter>);
+  await userEvent.click(screen.getByText("seed"));
+  await userEvent.type(screen.getByLabelText(/aantal stops/i), "4");
+  await userEvent.click(screen.getByRole("button", { name: /Genereer concept/i }));
+  const body = JSON.parse(fetchMock.mock.calls.at(-1)![1].body as string);
+  expect(body.desired_stops).toBe(4);
+  expect(body.from_concept).toBe(true);
+});
+
 test("the Publiceren button navigates to /studio/validate", async () => {
   const seeded = draft([]);
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(seeded), { status: 201 })));

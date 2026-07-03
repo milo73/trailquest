@@ -153,6 +153,12 @@ The Stop editor (`StopEditor.tsx`) now loads, edits, and persists a stop's story
 
 ---
 
+### Studio — "aantal stops" input
+
+The Route editor header contains a numeric input ("Aantal stops", placeholder "auto") next to the "Genereer concept" button. Entering a value in the range 2–15 sends `desired_stops` in the `POST /drafts` body, which controls how many stops the backend generates. Leaving it blank omits the field and lets the backend derive the count from the requested distance. The player's "Genereer speurtocht" (`Configure.tsx`) sends no `desired_stops`; it remains distance-only in the MVP.
+
+See `src/studio/screens/RouteEditor.tsx` for the input and handler.
+
 ### Studio route creation
 
 The creator studio now manages real draft trails backed by the FastAPI backend:

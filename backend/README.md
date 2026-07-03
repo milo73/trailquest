@@ -116,6 +116,12 @@ ruff format .                   # format
 mypy app                        # type-check
 ```
 
+## Stop count control
+
+`TrailRequest` (player, `POST /trails`) and `DraftCreate` (studio, `POST /drafts`) both accept an optional `desired_stops` field — an integer in the range **2–15**. When supplied it sets the target number of generated stops. The actual count is clamped to the number of POIs that carry verifiable facts (`has_verifiable_facts`), so the effective ceiling is always "however many grounded POIs are available". When `desired_stops` is omitted the route service derives a count from the requested distance (roughly one stop per kilometre, minimum 2).
+
+This is enforced in `_select_pois` in `app/services/route_service.py`.
+
 ## API endpoints
 
 | Method | Path | Description |
