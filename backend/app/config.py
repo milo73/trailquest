@@ -60,6 +60,10 @@ class Settings(BaseSettings):
     # Paraphrasable Wikipedia background for live POIs (CC BY-SA, attributed).
     enrich_wikipedia: bool = True
 
+    # Geocoding (place name → coordinates) via Nominatim (OpenStreetMap, ODbL).
+    # No API key required; usage policy requires a descriptive User-Agent.
+    nominatim_url: str = "https://nominatim.openstreetmap.org/search"
+
     # Walking-network routing (PRD §7.3). "none" falls back to a straight-line
     # estimate; "osrm" uses an OSRM-compatible server with the foot profile.
     routing_provider: str = "none"
