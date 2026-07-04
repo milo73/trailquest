@@ -73,6 +73,17 @@ def test_sqlite_persists_across_connections(tmp_path) -> None:
     assert SqliteContentStore(path).get(sid).story == "persisted"
 
 
+def test_sqlite_creates_missing_parent_dir(tmp_path) -> None:
+    # A db path pointing into a not-yet-existing directory must be created,
+    # not raise (mirrors FileDraftStore).
+    db = tmp_path / "nested" / "sub" / "content.db"
+    store = SqliteContentStore(str(db))
+    assert db.exists()
+    sid = stop_id_for("node/1", Theme.NATURE)
+    store.put(sid, _content(story="ok"))
+    assert store.get(sid).story == "ok"
+
+
 def test_content_service_caches_generation(monkeypatch: pytest.MonkeyPatch) -> None:
     """build_stop should generate once and serve the cache on the second call."""
     from app.services import content_service

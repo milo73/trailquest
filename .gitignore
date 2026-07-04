@@ -13,6 +13,7 @@ venv/
 # Generated content store + trail artifacts (backend runtime)
 *.db
 trails/
+drafts/
 haarlem_trail.json
 *.out
 
