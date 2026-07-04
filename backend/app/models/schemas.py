@@ -280,7 +280,8 @@ class DraftTrail(BaseModel):
 
 class DraftCreate(BaseModel):
     title: str | None = None
-    start: GeoPoint
+    place: str | None = None
+    start: GeoPoint | None = None
     distance_km: float = Field(default=5, ge=1, le=25)
     theme: Theme = Theme.MIXED
     from_concept: bool = False
