@@ -48,11 +48,13 @@ def test_generate_stop_content_filters_by_fact_keys():
     d = _draft_with_one_stop()
     stop_poi = draft_service.get(d.id).stops[0].poi
     # generate with an empty fact selection → story must not contain any fact value
-    story, questions, primary_index = draft_service.generate_stop_content(d.id, 1, fact_keys=[])
+    story, questions, primary_index, _deg = draft_service.generate_stop_content(
+        d.id, 1, fact_keys=[]
+    )
     for fact in stop_poi.facts:
         assert fact.value not in story
     # generate with all facts → at least one fact value appears (stub echoes facts)
-    story_all, _, _idx = draft_service.generate_stop_content(d.id, 1, fact_keys=None)
+    story_all, _, _idx, _deg2 = draft_service.generate_stop_content(d.id, 1, fact_keys=None)
     assert any(f.value in story_all for f in stop_poi.facts)
 
 

@@ -119,6 +119,7 @@ export function StopEditor() {
   const [tone, setTone] = useState("speels");
   const [regenerating, setRegenerating] = useState(false);
   const [regenError, setRegenError] = useState(false);
+  const [degraded, setDegraded] = useState(false);
 
   useEffect(() => {
     setStory(sourceStory);
@@ -249,9 +250,11 @@ export function StopEditor() {
     if (activeStopOrder === undefined) return;
     const factKeys = (activePoi?.facts ?? []).filter((f) => includedFacts[f.key] ?? true).map((f) => f.key);
     setRegenError(false);
+    setDegraded(false);
     setRegenerating(true);
     try {
       const result = await generateStopContent(activeStopOrder, { fact_keys: factKeys, tone });
+      setDegraded(Boolean(result.degraded));
       setStory(result.story);
       const seeded = seedDraftQuestions(result.questions);
       setQuestions(seeded);
@@ -648,6 +651,21 @@ export function StopEditor() {
                     }}
                   >
                     Genereren mislukt of duurde te lang — probeer opnieuw.
+                  </div>
+                )}
+                {degraded && !regenError && (
+                  <div
+                    role="status"
+                    style={{
+                      padding: "8px 17px",
+                      font: "500 12px/1.3 var(--tq-sans)",
+                      color: "#8a6d1f",
+                      background: "#fdf7e6",
+                      borderBottom: "1px solid #f0e6d4",
+                    }}
+                  >
+                    Basis-samenvatting — de AI-provider was niet beschikbaar; dit is een feiten-echo,
+                    geen echt gegenereerd verhaal.
                   </div>
                 )}
                 <div style={{ padding: "16px 18px" }}>

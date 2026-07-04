@@ -105,6 +105,7 @@ export interface StopGenerateResult {
   story: string;
   questions: Question[];
   primary_question_index?: number | null;
+  degraded?: boolean;
 }
 
 export interface CustomStopRequest {

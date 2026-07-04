@@ -79,9 +79,12 @@ def generate_stop_content(
     )
     if result is None:
         raise HTTPException(status_code=404, detail="Draft or stop not found")
-    story, questions, primary_index = result
+    story, questions, primary_index, degraded = result
     return StopGenerateResult(
-        story=story, questions=questions, primary_question_index=primary_index
+        story=story,
+        questions=questions,
+        primary_question_index=primary_index,
+        degraded=degraded,
     )
 
 
