@@ -111,3 +111,32 @@ def test_create_without_place_uses_start_and_default_city():
     draft = draft_service.create(DraftCreate(start=GeoPoint(lat=52.38, lon=4.63)))
     assert draft.city == "Haarlem"
     assert draft.start.lat == 52.38
+
+
+def test_create_from_place_with_no_pois_raises(monkeypatch):
+    from app.clients import nominatim
+    from app.clients.nominatim import GeoResult
+    from app.models.schemas import DraftCreate
+    from app.services import draft_service, poi_service
+
+    monkeypatch.setattr(
+        nominatim,
+        "geocode",
+        lambda q: GeoResult(lat=1.0, lon=2.0, city="Verweg", display_name="Verweg"),
+    )
+    # a geocoded place must NOT fall back to the Haarlem seed → no candidates → error
+    monkeypatch.setattr(poi_service, "_fetch_live", lambda near, dist: [])
+    monkeypatch.setattr(poi_service.settings, "poi_source", "live")
+    with pytest.raises(ValueError):
+        draft_service.create(DraftCreate(place="Verweg", from_concept=True))
+
+
+def test_candidates_seed_fallback_disabled_returns_empty(monkeypatch):
+    from app.models.schemas import GeoPoint
+    from app.services import poi_service
+
+    monkeypatch.setattr(poi_service, "_fetch_live", lambda near, dist: [])
+    monkeypatch.setattr(poi_service.settings, "poi_source", "live")
+    assert poi_service.candidates(GeoPoint(lat=1.0, lon=2.0), 5, allow_seed_fallback=False) == []
+    # default (True) still falls back to the seed set
+    assert len(poi_service.candidates(GeoPoint(lat=1.0, lon=2.0), 5)) > 0

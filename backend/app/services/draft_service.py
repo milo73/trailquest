@@ -83,7 +83,8 @@ def create(req: DraftCreate) -> DraftTrail:
                 distance_km=req.distance_km,
                 theme=req.theme,
                 desired_stops=req.desired_stops,
-            )
+            ),
+            allow_seed_fallback=req.place is None,
         )
         draft.stops = [
             DraftStop(
@@ -95,6 +96,8 @@ def create(req: DraftCreate) -> DraftTrail:
             )
             for s in trail.stops
         ]
+        if req.place and len(draft.stops) < 2:
+            raise ValueError(f"Geen geschikte POI's gevonden rond '{req.place}'")
     _measure(draft)
     drafts.put(draft)
     return draft

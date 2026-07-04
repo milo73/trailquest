@@ -109,9 +109,9 @@ def _select_pois(
     return with_facts[:target]
 
 
-def generate_trail(req: TrailRequest) -> Trail:
+def generate_trail(req: TrailRequest, *, allow_seed_fallback: bool = True) -> Trail:
     """Generate a full trail for the request (the thin end-to-end vertical)."""
-    candidates = poi_service.candidates(req.start, req.distance_km)
+    candidates = poi_service.candidates(req.start, req.distance_km, allow_seed_fallback)
     selected = _select_pois(candidates, req.distance_km, req.desired_stops)
     ordered, actual_km = _order_and_measure(req.start, selected)
 
