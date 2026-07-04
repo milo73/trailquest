@@ -47,6 +47,7 @@ def test_update_unknown_is_404():
 
 def test_create_with_unknown_place_returns_422(monkeypatch):
     from app.clients import nominatim
+
     monkeypatch.setattr(nominatim, "geocode", lambda q: None)
     r = client.post("/drafts", json={"place": "Nergensland"})
     assert r.status_code == 422

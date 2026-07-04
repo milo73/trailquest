@@ -65,17 +65,24 @@ def test_create_with_place_sets_start_and_city(monkeypatch):
     from app.models.schemas import DraftCreate
     from app.services import draft_service
 
-    monkeypatch.setattr(nominatim, "geocode", lambda q: GeoResult(lat=52.41, lon=4.62, city="Bloemendaal", display_name="Bloemendaal, NL"))
+    monkeypatch.setattr(
+        nominatim,
+        "geocode",
+        lambda q: GeoResult(
+            lat=52.41, lon=4.62, city="Bloemendaal", display_name="Bloemendaal, NL"
+        ),
+    )
     draft = draft_service.create(DraftCreate(place="Bloemendaal"))
     assert draft.city == "Bloemendaal"
     assert round(draft.start.lat, 2) == 52.41 and round(draft.start.lon, 2) == 4.62
 
 
 def test_create_place_not_found_raises(monkeypatch):
+    import pytest
+
     from app.clients import nominatim
     from app.models.schemas import DraftCreate
     from app.services import draft_service
-    import pytest
 
     monkeypatch.setattr(nominatim, "geocode", lambda q: None)
     with pytest.raises(ValueError):
@@ -83,13 +90,15 @@ def test_create_place_not_found_raises(monkeypatch):
 
 
 def test_create_place_client_error_raises(monkeypatch):
+    import pytest
+
     from app.clients import ClientError, nominatim
     from app.models.schemas import DraftCreate
     from app.services import draft_service
-    import pytest
 
     def _boom(q):
         raise ClientError("down")
+
     monkeypatch.setattr(nominatim, "geocode", _boom)
     with pytest.raises(ValueError):
         draft_service.create(DraftCreate(place="X"))
@@ -98,6 +107,7 @@ def test_create_place_client_error_raises(monkeypatch):
 def test_create_without_place_uses_start_and_default_city():
     from app.models.schemas import DraftCreate, GeoPoint
     from app.services import draft_service
+
     draft = draft_service.create(DraftCreate(start=GeoPoint(lat=52.38, lon=4.63)))
     assert draft.city == "Haarlem"
     assert draft.start.lat == 52.38

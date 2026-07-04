@@ -151,8 +151,14 @@ def test_wikipedia_fetch_qid_raises_on_http_error(monkeypatch: pytest.MonkeyPatc
 
 
 def test_nominatim_geocode_returns_coords_and_city(monkeypatch: pytest.MonkeyPatch) -> None:
-    payload = [{"lat": "52.409", "lon": "4.617", "display_name": "Bloemendaal, Noord-Holland, Nederland",
-                "address": {"village": "Bloemendaal", "municipality": "Bloemendaal"}}]
+    payload = [
+        {
+            "lat": "52.409",
+            "lon": "4.617",
+            "display_name": "Bloemendaal, Noord-Holland, Nederland",
+            "address": {"village": "Bloemendaal", "municipality": "Bloemendaal"},
+        }
+    ]
     monkeypatch.setattr(nominatim.httpx, "get", lambda *a, **k: _FakeResponse(payload))
     got = nominatim.geocode("Bloemendaal")
     assert got is not None
