@@ -2,11 +2,21 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Resolve .env relative to the repo root (backend/app/config.py -> repo root), so
+# settings load regardless of the working directory the server is started from
+# (e.g. `cd backend && uvicorn ...`). A missing file is ignored. Real environment
+# variables still take precedence (tests force offline defaults via conftest).
+_ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="TRAILQUEST_", env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_prefix="TRAILQUEST_", env_file=str(_ENV_FILE), extra="ignore"
+    )
 
     app_name: str = "TrailQuest"
     environment: str = "development"

@@ -244,6 +244,30 @@ test("Regenereer generates from selected facts and fills the fields", async () =
   expect(JSON.parse((genCall![1] as RequestInit).body as string).fact_keys).toEqual(["build_year"]);
 });
 
+test("Regenereer shows a degraded warning when the LLM was unavailable", async () => {
+  const draftWithStop = {
+    id: "d1", title: "t", city: "Haarlem", theme: "historical",
+    start: { lat: 52.38, lon: 4.63 }, requested_distance_km: 5, actual_distance_km: 1,
+    estimated_duration_min: 10,
+    stops: [{ order: 1, poi: { id: "p9", name: "Waag", location: { lat: 52.38, lon: 4.63 }, facts: [] }, story: "", questions: [], primary_question_index: null }],
+    status: "concept", attributions: [],
+  };
+  const fetchMock = vi.fn((url: string) => {
+    if (String(url).endsWith("/generate"))
+      return Promise.resolve(new Response(JSON.stringify({ story: "Waag — build year: 1370.", questions: [{ type: "C", prompt: "Kijk rond?", answer: null, hint: null, gates: false }], primary_question_index: 0, degraded: true }), { status: 200 }));
+    return Promise.resolve(new Response(JSON.stringify(draftWithStop), { status: 201 }));
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  function Seed() {
+    const { setActiveStop, createDraft } = useDraft();
+    return <button onClick={async () => { await createDraft({ start: { lat: 52.38, lon: 4.63 } }); setActiveStop(1); }}>seed</button>;
+  }
+  render(<MemoryRouter><DraftProvider><Seed /><StopEditor /></DraftProvider></MemoryRouter>);
+  await userEvent.click(screen.getByText("seed"));
+  await userEvent.click(await screen.findByRole("button", { name: /Regenereer|Genereren/i }));
+  expect(await screen.findByText(/Basis-samenvatting/i)).toBeInTheDocument();
+});
+
 test("prev/next pagination changes the active stop", async () => {
   const draftWithStops = {
     id: "d1", title: "t", city: "Haarlem", theme: "historical",

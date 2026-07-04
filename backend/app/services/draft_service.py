@@ -149,7 +149,7 @@ def set_stop_content(
 
 def generate_stop_content(
     draft_id: str, order: int, *, fact_keys: list[str] | None = None, tone: str | None = None
-) -> tuple[str, list[Question], int] | None:
+) -> tuple[str, list[Question], int, bool] | None:
     draft = drafts.get(draft_id)
     if draft is None:
         return None

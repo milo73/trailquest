@@ -321,6 +321,9 @@ class StopGenerateResult(BaseModel):
     story: str
     questions: list[Question]
     primary_question_index: int | None = None
+    # True when the story is an offline stub fallback (no real LLM), so the studio
+    # can flag it instead of mislabelling it "AI-gegenereerd".
+    degraded: bool = False
 
 
 class CustomStopRequest(BaseModel):

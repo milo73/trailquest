@@ -137,24 +137,32 @@ def build_stop(poi: POI, theme: Theme, order: int) -> Stop:
 
 def author_content(
     poi: POI, theme: Theme, tone: str | None = None
-) -> tuple[str, list[Question], int]:
+) -> tuple[str, list[Question], int, bool]:
     """Generate authoring content (story + candidate questions) for one POI.
 
     Unlike :func:`build_stop` this never reads or writes the (POI × theme) cache —
     the studio author wants fresh output scoped to the facts they selected (the
     caller passes a POI carrying only those facts). Degrades to the stub on any
     provider failure (PRD §13).
+
+    Returns ``(story, questions, primary_index, degraded)``. ``degraded`` is True
+    when the story came from the offline :class:`StubProvider` — either because
+    that is the configured provider or because a real provider failed and we fell
+    back — so the studio can flag "basis-samenvatting, geen echte AI-tekst".
     """
     questions, primary_index = _build_questions(poi)
+    provider = get_llm_provider()
+    degraded = isinstance(provider, StubProvider)
     try:
-        story = get_llm_provider().rephrase(
+        story = provider.rephrase(
             poi_name=poi.name, theme=theme, facts=poi.facts, background=poi.background, tone=tone
         )
     except RuntimeError:
         story = StubProvider().rephrase(
             poi_name=poi.name, theme=theme, facts=poi.facts, background=poi.background, tone=tone
         )
-    return story, questions, primary_index
+        degraded = True
+    return story, questions, primary_index, degraded
 
 
 def collect_attributions(sources: list[Source]) -> list[str]:
