@@ -125,6 +125,7 @@ export function NewTrailForm({ submitting, onClose, onSubmit }: Props) {
               value={place}
               onChange={(e) => setPlace(e.target.value)}
               placeholder="bijv. Haarlem"
+              required
               style={{
                 height: 38,
                 padding: "0 10px",
@@ -252,7 +253,7 @@ export function NewTrailForm({ submitting, onClose, onSubmit }: Props) {
               height: 42,
               borderRadius: 10,
               border: "none",
-              background: canSubmit ? "#283a5e" : "#cbbfa6",
+              background: canSubmit ? "var(--tq-navy)" : "var(--tq-sand)",
               font: "600 14px/1 var(--tq-sans)",
               color: "#fff",
               cursor: canSubmit ? "pointer" : "default",
