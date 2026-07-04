@@ -132,6 +132,9 @@ class SqliteContentStore(ContentStore):
         # check_same_thread=False + a lock keeps it safe under the dev server's
         # threadpool without a per-request connection.
         self._lock = threading.Lock()
+        # Create the parent directory if the path points into one (mirrors
+        # FileDraftStore); a bare filename resolves to "." and is a no-op.
+        Path(db_path).parent.mkdir(parents=True, exist_ok=True)
         self._conn = sqlite3.connect(db_path, check_same_thread=False)
         self._conn.execute(
             """
