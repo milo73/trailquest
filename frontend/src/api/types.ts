@@ -71,7 +71,8 @@ export interface DraftTrail {
 
 export interface DraftCreate {
   title?: string;
-  start: GeoPoint;
+  place?: string;
+  start?: GeoPoint;
   distance_km?: number;
   theme?: Theme;
   from_concept?: boolean;

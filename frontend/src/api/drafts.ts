@@ -11,7 +11,8 @@ import type {
 } from "./types";
 
 export const createDraft = (req: DraftCreate) =>
-  apiFetch<DraftTrail>("/drafts", { method: "POST", body: JSON.stringify(req) });
+  apiFetch<DraftTrail>("/drafts", { method: "POST", body: JSON.stringify(req) },
+    { timeoutMs: req.from_concept ? 180000 : 15000 });
 
 export const getDraft = (id: string) => apiFetch<DraftTrail>(`/drafts/${id}`);
 
