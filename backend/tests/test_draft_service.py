@@ -57,3 +57,86 @@ def test_update_skips_unknown_poi_id():
     d = draft_service.create(DraftCreate(start=HAARLEM))
     updated = draft_service.update(d.id, DraftUpdate(stop_poi_ids=["does-not-exist"]))
     assert updated.stops == []
+
+
+def test_create_with_place_sets_start_and_city(monkeypatch):
+    from app.clients import nominatim
+    from app.clients.nominatim import GeoResult
+    from app.models.schemas import DraftCreate
+    from app.services import draft_service
+
+    monkeypatch.setattr(
+        nominatim,
+        "geocode",
+        lambda q: GeoResult(
+            lat=52.41, lon=4.62, city="Bloemendaal", display_name="Bloemendaal, NL"
+        ),
+    )
+    draft = draft_service.create(DraftCreate(place="Bloemendaal"))
+    assert draft.city == "Bloemendaal"
+    assert round(draft.start.lat, 2) == 52.41 and round(draft.start.lon, 2) == 4.62
+
+
+def test_create_place_not_found_raises(monkeypatch):
+    import pytest
+
+    from app.clients import nominatim
+    from app.models.schemas import DraftCreate
+    from app.services import draft_service
+
+    monkeypatch.setattr(nominatim, "geocode", lambda q: None)
+    with pytest.raises(ValueError):
+        draft_service.create(DraftCreate(place="Nergensland"))
+
+
+def test_create_place_client_error_raises(monkeypatch):
+    import pytest
+
+    from app.clients import ClientError, nominatim
+    from app.models.schemas import DraftCreate
+    from app.services import draft_service
+
+    def _boom(q):
+        raise ClientError("down")
+
+    monkeypatch.setattr(nominatim, "geocode", _boom)
+    with pytest.raises(ValueError):
+        draft_service.create(DraftCreate(place="X"))
+
+
+def test_create_without_place_uses_start_and_default_city():
+    from app.models.schemas import DraftCreate, GeoPoint
+    from app.services import draft_service
+
+    draft = draft_service.create(DraftCreate(start=GeoPoint(lat=52.38, lon=4.63)))
+    assert draft.city == "Haarlem"
+    assert draft.start.lat == 52.38
+
+
+def test_create_from_place_with_no_pois_raises(monkeypatch):
+    from app.clients import nominatim
+    from app.clients.nominatim import GeoResult
+    from app.models.schemas import DraftCreate
+    from app.services import draft_service, poi_service
+
+    monkeypatch.setattr(
+        nominatim,
+        "geocode",
+        lambda q: GeoResult(lat=1.0, lon=2.0, city="Verweg", display_name="Verweg"),
+    )
+    # a geocoded place must NOT fall back to the Haarlem seed → no candidates → error
+    monkeypatch.setattr(poi_service, "_fetch_live", lambda near, dist: [])
+    monkeypatch.setattr(poi_service.settings, "poi_source", "live")
+    with pytest.raises(ValueError):
+        draft_service.create(DraftCreate(place="Verweg", from_concept=True))
+
+
+def test_candidates_seed_fallback_disabled_returns_empty(monkeypatch):
+    from app.models.schemas import GeoPoint
+    from app.services import poi_service
+
+    monkeypatch.setattr(poi_service, "_fetch_live", lambda near, dist: [])
+    monkeypatch.setattr(poi_service.settings, "poi_source", "live")
+    assert poi_service.candidates(GeoPoint(lat=1.0, lon=2.0), 5, allow_seed_fallback=False) == []
+    # default (True) still falls back to the seed set
+    assert len(poi_service.candidates(GeoPoint(lat=1.0, lon=2.0), 5)) > 0

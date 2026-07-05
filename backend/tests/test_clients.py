@@ -5,7 +5,7 @@ from __future__ import annotations
 import httpx
 import pytest
 
-from app.clients import ClientError, osrm, overpass, wikidata, wikipedia
+from app.clients import ClientError, nominatim, osrm, overpass, wikidata, wikipedia
 
 
 class _FakeResponse:
@@ -148,6 +148,39 @@ def test_wikipedia_fetch_qid_raises_on_http_error(monkeypatch: pytest.MonkeyPatc
     monkeypatch.setattr(wikipedia.httpx, "get", lambda *a, **k: _FakeResponse({}, status=500))
     with pytest.raises(ClientError):
         wikipedia.fetch_wikidata_qid("X")
+
+
+def test_nominatim_geocode_returns_coords_and_city(monkeypatch: pytest.MonkeyPatch) -> None:
+    payload = [
+        {
+            "lat": "52.409",
+            "lon": "4.617",
+            "display_name": "Bloemendaal, Noord-Holland, Nederland",
+            "address": {"village": "Bloemendaal", "municipality": "Bloemendaal"},
+        }
+    ]
+    monkeypatch.setattr(nominatim.httpx, "get", lambda *a, **k: _FakeResponse(payload))
+    got = nominatim.geocode("Bloemendaal")
+    assert got is not None
+    assert round(got.lat, 3) == 52.409 and round(got.lon, 3) == 4.617
+    assert got.city == "Bloemendaal"
+
+
+def test_nominatim_geocode_city_falls_back_to_display_name(monkeypatch: pytest.MonkeyPatch) -> None:
+    payload = [{"lat": "1.0", "lon": "2.0", "display_name": "Ergens, Land"}]  # no address block
+    monkeypatch.setattr(nominatim.httpx, "get", lambda *a, **k: _FakeResponse(payload))
+    assert nominatim.geocode("Ergens").city == "Ergens"
+
+
+def test_nominatim_geocode_none_when_no_results(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(nominatim.httpx, "get", lambda *a, **k: _FakeResponse([]))
+    assert nominatim.geocode("Nergensland") is None
+
+
+def test_nominatim_raises_client_error_on_http_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(nominatim.httpx, "get", lambda *a, **k: _FakeResponse({}, status=500))
+    with pytest.raises(ClientError):
+        nominatim.geocode("X")
 
 
 def test_osrm_orders_loop_and_reports_distance(monkeypatch: pytest.MonkeyPatch) -> None:

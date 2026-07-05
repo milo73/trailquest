@@ -129,18 +129,24 @@ def _fetch_live(near: GeoPoint, distance_km: float) -> list[POI]:
     return pois
 
 
-def candidates(near: GeoPoint, distance_km: float) -> list[POI]:
+def candidates(near: GeoPoint, distance_km: float, allow_seed_fallback: bool = True) -> list[POI]:
     """Return candidate POIs near a start point.
 
     Uses the live OSM/Wikidata pipeline when ``poi_source == "live"``, falling
-    back to the bundled Haarlem seed set on any upstream failure.
+    back to the bundled Haarlem seed set on any upstream failure — unless
+    ``allow_seed_fallback`` is False (e.g. for a geocoded place where falling
+    back to Haarlem stops would be a content-accuracy violation).
     """
     if settings.poi_source == "live":
         try:
             live = _fetch_live(near, distance_km)
             if live:
                 return live
-            logger.warning("live POI source returned nothing; using seed set")
+            _seed_or_not = "using seed set" if allow_seed_fallback else "no seed fallback"
+            logger.warning("live POI source returned nothing; %s", _seed_or_not)
         except ClientError as exc:
-            logger.warning("live POI source failed (%s); using seed set", exc)
+            _seed_or_not = "using seed set" if allow_seed_fallback else "no seed fallback"
+            logger.warning("live POI source failed (%s); %s", exc, _seed_or_not)
+    if not allow_seed_fallback:
+        return []
     return list(_HAARLEM_POIS)

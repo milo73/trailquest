@@ -10,6 +10,7 @@ from __future__ import annotations
 import uuid
 
 from app.cache.store import drafts
+from app.clients import ClientError, nominatim
 from app.config import settings
 from app.models.schemas import (
     POI,
@@ -50,12 +51,26 @@ def _measure(draft: DraftTrail) -> DraftTrail:
 
 
 def create(req: DraftCreate) -> DraftTrail:
+    start = req.start
+    city = settings.default_city
+    if req.place and req.place.strip():
+        try:
+            geo = nominatim.geocode(req.place.strip())
+        except ClientError as exc:
+            raise ValueError(f"Plaats kon niet worden opgezocht: {req.place}") from exc
+        if geo is None:
+            raise ValueError(f"Plaats '{req.place}' niet gevonden")
+        start = GeoPoint(lat=geo.lat, lon=geo.lon)
+        city = geo.city
+    if start is None:
+        start = GeoPoint(lat=settings.default_city_lat, lon=settings.default_city_lon)
+
     draft = DraftTrail(
         id=str(uuid.uuid4()),
         title=req.title or "Nieuwe tocht",
-        city=settings.default_city,
+        city=city,
         theme=req.theme,
-        start=req.start,
+        start=start,
         requested_distance_km=req.distance_km,
         actual_distance_km=0.0,
         estimated_duration_min=0,
@@ -64,11 +79,12 @@ def create(req: DraftCreate) -> DraftTrail:
     if req.from_concept:
         trail = route_service.generate_trail(
             TrailRequest(
-                start=req.start,
+                start=start,
                 distance_km=req.distance_km,
                 theme=req.theme,
                 desired_stops=req.desired_stops,
-            )
+            ),
+            allow_seed_fallback=req.place is None,
         )
         draft.stops = [
             DraftStop(
@@ -80,6 +96,8 @@ def create(req: DraftCreate) -> DraftTrail:
             )
             for s in trail.stops
         ]
+        if req.place and len(draft.stops) < 2:
+            raise ValueError(f"Geen geschikte POI's gevonden rond '{req.place}'")
     _measure(draft)
     drafts.put(draft)
     return draft
