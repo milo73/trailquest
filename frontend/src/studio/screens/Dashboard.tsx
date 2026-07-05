@@ -4,7 +4,8 @@ import { StudioChrome } from "../StudioChrome";
 import { MOCK_TRAILS, MOCK_DASHBOARD_STATS, type StudioTrailCard } from "../mock/trails";
 import { listDrafts } from "../../api/drafts";
 import { useDraft } from "../draftStore";
-import type { DraftTrail } from "../../api/types";
+import type { DraftCreate, DraftTrail } from "../../api/types";
+import { NewTrailForm } from "../components/NewTrailForm";
 
 function formatKm(km: number): string {
   return km.toFixed(1).replace(".", ",");
@@ -199,6 +200,7 @@ export function Dashboard() {
   const { createDraft, loadDraft } = useDraft();
   const [realDrafts, setRealDrafts] = useState<DraftTrail[]>([]);
   const [creating, setCreating] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
 
   useEffect(() => {
     listDrafts()
@@ -215,14 +217,14 @@ export function Dashboard() {
     }
   }, [loadDraft, navigate]);
 
-  async function handleCreate() {
-    if (creating) return;
+  async function handleGenerate(req: DraftCreate) {
     setCreating(true);
     try {
-      await createDraft({ start: { lat: 52.3812, lon: 4.6361 }, distance_km: 5, theme: "mixed" });
+      await createDraft(req);
+      setModalOpen(false);
       navigate("/studio/route");
-    } catch {
-      // ignore failed create
+    } catch (e) {
+      throw e;
     } finally {
       setCreating(false);
     }
@@ -302,7 +304,7 @@ export function Dashboard() {
 
           {/* "Nieuwe tocht maken" card */}
           <div
-            onClick={creating ? undefined : handleCreate}
+            onClick={creating ? undefined : () => setModalOpen(true)}
             role="button"
             aria-disabled={creating}
             style={{
@@ -341,6 +343,13 @@ export function Dashboard() {
           </div>
         </div>
       </div>
+      {modalOpen && (
+        <NewTrailForm
+          submitting={creating}
+          onClose={() => setModalOpen(false)}
+          onSubmit={handleGenerate}
+        />
+      )}
     </StudioChrome>
   );
 }
