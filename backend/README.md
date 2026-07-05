@@ -145,6 +145,19 @@ mypy app                        # type-check
 
 This is enforced in `_select_pois` in `app/services/route_service.py`.
 
+### Place-based concept creation
+
+`DraftCreate` (`POST /drafts`) accepts an optional `place` (free-text town/place name). When
+supplied it is geocoded via **Nominatim** (`app/clients/nominatim.py`, `TRAILQUEST_NOMINATIM_URL`)
+into the draft's `start` coordinates and `city` label (fixing the previously hardcoded "Haarlem"
+label). Resolution priority is `place > start > default-city coords`. A place that can't be
+resolved (not found, or the geocoder is unreachable) raises a `ValueError` → **422** with a Dutch
+message, so the studio form can show it and create nothing. For a geocoded place, the Haarlem-seed
+fallback in `poi_service.candidates` is **disabled** (`allow_seed_fallback=False`) — a place with no
+real OSM/Wikidata POIs yields a 422 ("Geen geschikte POI's gevonden…") rather than silently building
+a trail from Haarlem seed stops (content-accuracy: never present non-local POIs as local). Requires
+`TRAILQUEST_POI_SOURCE=live`.
+
 ## API endpoints
 
 | Method | Path | Description |
@@ -155,7 +168,7 @@ This is enforced in `_select_pois` in `app/services/route_service.py`.
 | `POST` | `/trails/{id}/answer` | Check answer for a stop; body: `stop_order`, `answer`, `attempt`, optional `question_index` (defaults to primary) |
 | `GET` | `/pois` | List candidate POIs near a location (query params: `lat`, `lon`, `distance_km`) |
 | `POST` | `/routes/measure` | Compute walking distance/duration for an ordered list of coordinates |
-| `POST` | `/drafts` | Create a new draft trail |
+| `POST` | `/drafts` | Create a draft trail; optional `place` (geocoded to `start`+`city`; 422 if not found), `start`, `distance_km`, `theme`, `desired_stops`, `from_concept` (generates real POIs + AI content) |
 | `GET` | `/drafts` | List all draft trails |
 | `GET` | `/drafts/{id}` | Fetch a single draft trail |
 | `PUT` | `/drafts/{id}` | Update a draft trail (title, stops, status, etc.) |

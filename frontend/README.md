@@ -114,7 +114,7 @@ src/
     ├── StudioChrome.tsx     shell nav (Dashboard / Route / Stop / Validation)
     ├── StudioApp.tsx        router root
     └── screens/
-        ├── Dashboard.tsx    trail cards + stats
+        ├── Dashboard.tsx    trail cards + stats; "Nieuwe tocht maken" opens NewTrailForm (plaats/afstand/thema/aantal → AI concept)
         ├── RouteEditor.tsx  stop list + reorder controls
         ├── StopEditor.tsx   stop detail — content, multi-question list with a "primair (poort)" radio
         │                    (only Type A/D may be primary; Type B forces gate off)
