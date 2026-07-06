@@ -21,6 +21,24 @@ from app.config import settings
 class TripResult:
     order: list[int]  # input point indices in optimized visiting order
     distance_km: float
+    geometry: list[tuple[float, float]] | None = None  # (lat, lon) along the path
+
+
+@dataclass(frozen=True)
+class RouteResult:
+    distance_km: float
+    geometry: list[tuple[float, float]] | None  # (lat, lon) along the path
+
+
+def _geometry(obj: dict) -> list[tuple[float, float]] | None:
+    """Extract a GeoJSON LineString as (lat, lon) pairs (OSRM emits [lon, lat])."""
+    geo = obj.get("geometry")
+    if not isinstance(geo, dict):
+        return None
+    coords = geo.get("coordinates")
+    if not coords:
+        return None
+    return [(lat, lon) for lon, lat in coords]
 
 
 def optimized_loop(points: list[tuple[float, float]]) -> TripResult:
@@ -38,7 +56,8 @@ def optimized_loop(points: list[tuple[float, float]]) -> TripResult:
     try:
         resp = httpx.get(
             url,
-            params={"source": "first", "roundtrip": "true", "overview": "false"},
+            params={"source": "first", "roundtrip": "true",
+                    "overview": "full", "geometries": "geojson"},
             timeout=settings.http_timeout,
         )
         resp.raise_for_status()
@@ -52,4 +71,28 @@ def optimized_loop(points: list[tuple[float, float]]) -> TripResult:
     except (httpx.HTTPError, ValueError, KeyError, IndexError) as exc:
         raise ClientError(f"OSRM request failed: {exc}") from exc
 
-    return TripResult(order=order, distance_km=round(distance_km, 2))
+    return TripResult(order=order, distance_km=round(distance_km, 2), geometry=_geometry(trip))
+
+
+def route(points: list[tuple[float, float]]) -> RouteResult:
+    """Distance + geometry for ``points`` (lat, lon) in the GIVEN order (no reordering)."""
+    if len(points) < 2:
+        raise ClientError("need at least two points to route")
+    coords = ";".join(f"{lon},{lat}" for lat, lon in points)
+    url = f"{settings.osrm_url.rstrip('/')}/route/v1/foot/{coords}"
+    try:
+        resp = httpx.get(
+            url,
+            params={"overview": "full", "geometries": "geojson"},
+            timeout=settings.http_timeout,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        if data.get("code") != "Ok":
+            raise ClientError(f"OSRM returned code={data.get('code')}")
+        r = data["routes"][0]
+        distance_km = round(float(r["distance"]) / 1000.0, 2)
+        geometry = _geometry(r)
+    except (httpx.HTTPError, ValueError, KeyError, IndexError) as exc:
+        raise ClientError(f"OSRM request failed: {exc}") from exc
+    return RouteResult(distance_km=distance_km, geometry=geometry)
