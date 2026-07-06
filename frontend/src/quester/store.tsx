@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState } from 
 import type { Trail, TrailRequest } from "../api/types";
 import { pointsFor, type SolveRecord } from "./gamification";
 
-export type Phase = "configure" | "preview" | "navigate" | "stop" | "finish";
+export type Phase = "browse" | "configure" | "preview" | "navigate" | "stop" | "finish";
 
 export interface QuesterState {
   phase: Phase;
@@ -15,7 +15,7 @@ export interface QuesterState {
 
 const STORAGE_KEY = "tq.quester";
 const DEFAULT_STATE: QuesterState = {
-  phase: "configure",
+  phase: "browse",
   config: { start: { lat: 52.3812, lon: 4.6361 }, distance_km: 5, theme: "historical" },
   currentOrder: 1,
   solves: {},
@@ -36,6 +36,7 @@ interface QuesterApi {
   state: QuesterState;
   setConfig: (partial: Partial<TrailRequest>) => void;
   setTrail: (trail: Trail) => void;
+  goToConfigure: () => void;
   goToStop: (order: number) => void;
   recordSolve: (order: number, record: SolveRecord) => void;
   arriveAtNextOrFinish: () => void;
@@ -62,6 +63,7 @@ export function QuesterProvider({ children }: { children: React.ReactNode }) {
       setConfig: (partial) => setState((s) => ({ ...s, config: { ...s.config, ...partial } })),
       setTrail: (trail) =>
         setState((s) => ({ ...s, trail, phase: "preview", currentOrder: trail.stops[0]?.order ?? 1, solves: {}, points: 0 })),
+      goToConfigure: () => setState((s) => ({ ...s, phase: "configure" })),
       goToStop: (order) => setState((s) => ({ ...s, phase: "stop", currentOrder: order })),
       recordSolve: (order, record) =>
         setState((s) => ({
