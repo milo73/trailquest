@@ -5,7 +5,7 @@ import {
   Button,
   Chip,
   EyebrowLabel,
-  MapCanvas,
+  TileMap,
   PhoneFrame,
   StatTile,
 } from "../../design-system/primitives";
@@ -54,10 +54,10 @@ export function Preview() {
   const secondStop = trail.stops[1];
   const surpriseCount = trail.stops.length - 2;
 
-  const mapStops = trail.stops.map((stop, i) => ({
-    order: stop.order,
-    label: i === 0 ? "S" : String(stop.order),
-  }));
+  const mapStops = [
+    { order: 0, label: "S", lat: trail.start.lat, lon: trail.start.lon },
+    ...trail.stops.map((s) => ({ order: s.order, label: String(s.order), lat: s.poi.location.lat, lon: s.poi.location.lon })),
+  ];
 
   async function handleRegenerate() {
     setRegenerating(true);
@@ -73,7 +73,7 @@ export function Preview() {
     <PhoneFrame>
       {/* Map header */}
       <div style={{ position: "relative", height: 270 }}>
-        <MapCanvas stops={mapStops} height={270} />
+        <TileMap stops={mapStops} routeGeometry={trail.route_geometry} />
         {/* status bar */}
         <div
           style={{

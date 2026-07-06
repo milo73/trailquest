@@ -199,6 +199,8 @@ class Trail(BaseModel):
     stops: list[Stop]
     # Attribution carried through to display (PRD §10).
     attributions: list[str] = Field(default_factory=list)
+    # Walking-path geometry from OSRM; None when haversine fallback is used.
+    route_geometry: list[GeoPoint] | None = None
 
 
 class TrailRequest(BaseModel):
@@ -276,6 +278,8 @@ class DraftTrail(BaseModel):
     stops: list[DraftStop] = Field(default_factory=list)
     status: DraftStatus = DraftStatus.CONCEPT
     attributions: list[str] = Field(default_factory=list)
+    # Walking-path geometry from OSRM; None when haversine fallback is used.
+    route_geometry: list[GeoPoint] | None = None
 
 
 class DraftCreate(BaseModel):

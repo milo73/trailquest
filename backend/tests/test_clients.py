@@ -204,3 +204,47 @@ def test_osrm_raises_on_non_ok_code(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(osrm.httpx, "get", lambda *a, **k: _FakeResponse({"code": "NoRoute"}))
     with pytest.raises(ClientError):
         osrm.optimized_loop([(52.0, 4.0), (52.1, 4.1)])
+
+
+_OSRM_TRIP = {
+    "code": "Ok",
+    "trips": [
+        {
+            "distance": 1234.0,
+            "geometry": {
+                "type": "LineString",
+                "coordinates": [[4.63, 52.38], [4.64, 52.39], [4.65, 52.38]],
+            },
+        }
+    ],
+    "waypoints": [{"waypoint_index": 0}, {"waypoint_index": 1}, {"waypoint_index": 2}],
+}
+_OSRM_ROUTE = {
+    "code": "Ok",
+    "routes": [
+        {
+            "distance": 900.0,
+            "geometry": {"type": "LineString", "coordinates": [[4.63, 52.38], [4.64, 52.39]]},
+        }
+    ],
+}
+
+
+def test_optimized_loop_parses_geometry(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(osrm.httpx, "get", lambda *a, **k: _FakeResponse(_OSRM_TRIP))
+    trip = osrm.optimized_loop([(52.38, 4.63), (52.39, 4.64), (52.38, 4.65)])
+    assert trip.distance_km == 1.23
+    assert trip.geometry == [(52.38, 4.63), (52.39, 4.64), (52.38, 4.65)]  # (lat,lon)
+
+
+def test_route_returns_distance_and_geometry(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(osrm.httpx, "get", lambda *a, **k: _FakeResponse(_OSRM_ROUTE))
+    r = osrm.route([(52.38, 4.63), (52.39, 4.64)])
+    assert r.distance_km == 0.9
+    assert r.geometry == [(52.38, 4.63), (52.39, 4.64)]
+
+
+def test_route_raises_client_error_on_http_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(osrm.httpx, "get", lambda *a, **k: _FakeResponse({}, status=500))
+    with pytest.raises(ClientError):
+        osrm.route([(52.38, 4.63), (52.39, 4.64)])

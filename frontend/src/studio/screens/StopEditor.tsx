@@ -5,7 +5,7 @@ import { StudioChrome } from "../StudioChrome";
 import { SourceBadge } from "../../design-system/primitives/SourceBadge";
 import { Button } from "../../design-system/primitives/Button";
 import { PhoneFrame } from "../../design-system/primitives/PhoneFrame";
-import { MapCanvas } from "../../design-system/primitives/MapCanvas";
+import { TileMap } from "../../design-system/primitives";
 import { useDraft } from "../draftStore";
 
 /** Pure helper: only Type A and D can gate the next stop. */
@@ -278,7 +278,12 @@ export function StopEditor() {
     await saveStopContent(activeStopOrder, { story });
   }
 
-  const mapStops = [{ order: 4, label: "4" }];
+  const mapStops = draft
+    ? [
+        { order: 0, label: "S", lat: draft.start.lat, lon: draft.start.lon },
+        ...draft.stops.map((s) => ({ order: s.order, label: String(s.order), lat: s.poi.location.lat, lon: s.poi.location.lon })),
+      ]
+    : [];
 
   // For the preview panel, show the primary question's prompt
   const primaryQ = questions[primaryIndex] ?? questions[0];
@@ -377,7 +382,7 @@ export function StopEditor() {
               border: "1px solid #e0d5bf",
             }}
           >
-            <MapCanvas stops={mapStops} activeOrder={4} width={212} height={128} />
+            <TileMap stops={mapStops} routeGeometry={draft?.route_geometry} activeOrder={activeStop?.order} />
           </div>
 
           {/* POI info */}

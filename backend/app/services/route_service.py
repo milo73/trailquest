@@ -54,32 +54,48 @@ def _loop_distance_km(start: GeoPoint, ordered: list[POI]) -> float:
     return sum(_haversine_km(points[i], points[i + 1]) for i in range(len(points) - 1))
 
 
-def measure_loop(start: GeoPoint, ordered_points: list[GeoPoint]) -> tuple[float, int]:
+def measure_loop(
+    start: GeoPoint, ordered_points: list[GeoPoint]
+) -> tuple[float, int, list[GeoPoint] | None]:
     """Measure a loop (start → points → start) in the given order.
 
-    The creator controls stop order, so this does NOT reorder. Distance is the
-    haversine loop estimate; duration adds walking time plus per-stop time.
-    Returns ``(distance_km, duration_min)``.
+    The creator controls stop order, so this does NOT reorder. Uses OSRM
+    ``route`` when configured; falls back to haversine otherwise.
+    Returns ``(distance_km, duration_min, geometry)``.
     """
     if not ordered_points:
-        return 0.0, 0
+        return 0.0, 0, None
     points = [start, *ordered_points, start]
-    distance = round(
-        sum(_haversine_km(points[i], points[i + 1]) for i in range(len(points) - 1)), 2
-    )
+    distance: float | None = None
+    geometry: list[GeoPoint] | None = None
+    if settings.routing_provider == "osrm":
+        try:
+            r = osrm.route([(p.lat, p.lon) for p in points])
+            distance = r.distance_km
+            geometry = (
+                [GeoPoint(lat=lat, lon=lon) for lat, lon in r.geometry] if r.geometry else None
+            )
+        except ClientError as exc:
+            logger.warning("OSRM route failed (%s); using haversine estimate", exc)
+    if distance is None:
+        distance = round(
+            sum(_haversine_km(points[i], points[i + 1]) for i in range(len(points) - 1)), 2
+        )
     walk_min = (distance / settings.walking_speed_kmh) * 60
     duration = round(walk_min + len(ordered_points) * settings.minutes_per_stop)
-    return distance, duration
+    return distance, duration, geometry
 
 
-def _order_and_measure(start: GeoPoint, selected: list[POI]) -> tuple[list[POI], float]:
-    """Order stops into a loop and return (ordered_pois, loop_distance_km).
+def _order_and_measure(
+    start: GeoPoint, selected: list[POI]
+) -> tuple[list[POI], float, list[GeoPoint] | None]:
+    """Order stops into a loop and return (ordered_pois, loop_distance_km, geometry).
 
     Uses OSRM's walking-network `trip` service when configured, falling back to
     the haversine nearest-neighbour estimate on any routing failure.
     """
     if not selected:
-        return [], 0.0
+        return [], 0.0, None
 
     if settings.routing_provider == "osrm":
         try:
@@ -87,12 +103,17 @@ def _order_and_measure(start: GeoPoint, selected: list[POI]) -> tuple[list[POI],
             trip = osrm.optimized_loop(points)
             # trip.order is over points (index 0 == start); map the rest to POIs.
             ordered = [selected[i - 1] for i in trip.order if i != 0]
-            return ordered, trip.distance_km
+            geometry = (
+                [GeoPoint(lat=lat, lon=lon) for lat, lon in trip.geometry]
+                if trip.geometry
+                else None
+            )
+            return ordered, trip.distance_km, geometry
         except ClientError as exc:
             logger.warning("OSRM routing failed (%s); using haversine estimate", exc)
 
     ordered = _nearest_neighbour_loop(start, selected)
-    return ordered, round(_loop_distance_km(start, ordered), 2)
+    return ordered, round(_loop_distance_km(start, ordered), 2), None
 
 
 def _select_pois(
@@ -113,7 +134,7 @@ def generate_trail(req: TrailRequest, *, allow_seed_fallback: bool = True) -> Tr
     """Generate a full trail for the request (the thin end-to-end vertical)."""
     candidates = poi_service.candidates(req.start, req.distance_km, allow_seed_fallback)
     selected = _select_pois(candidates, req.distance_km, req.desired_stops)
-    ordered, actual_km = _order_and_measure(req.start, selected)
+    ordered, actual_km, geometry = _order_and_measure(req.start, selected)
 
     stops = [
         content_service.build_stop(poi, req.theme, order=i + 1) for i, poi in enumerate(ordered)
@@ -140,6 +161,7 @@ def generate_trail(req: TrailRequest, *, allow_seed_fallback: bool = True) -> Tr
         start=req.start,
         stops=stops,
         attributions=sorted(attributions),
+        route_geometry=geometry,
     )
 
 

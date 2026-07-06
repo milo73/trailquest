@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { StudioChrome } from "../StudioChrome";
-import { MapCanvas } from "../../design-system/primitives/MapCanvas";
+import { TileMap } from "../../design-system/primitives";
 import { Button } from "../../design-system/primitives/Button";
 import { Chip } from "../../design-system/primitives/Chip";
 import { useDraft } from "../draftStore";
@@ -580,7 +580,7 @@ export function RouteEditor() {
 
         {/* Center map area */}
         <div style={{ flex: 1, position: "relative", background: "#ece4d3", overflow: "hidden" }}>
-          <MapCanvas stops={mapStops} />
+          <TileMap stops={mapStops} routeGeometry={draft.route_geometry} />
 
           {/* Toolbar */}
           <div

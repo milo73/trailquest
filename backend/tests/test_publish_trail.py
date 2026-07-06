@@ -50,6 +50,14 @@ def test_to_trail_reuses_id_and_converts_stops():
     assert trail.attributions == ["Wikidata (CC0)"]
 
 
+def test_to_trail_carries_route_geometry():
+    from app.models.schemas import GeoPoint
+
+    draft = _draft()
+    draft.route_geometry = [GeoPoint(lat=1.0, lon=2.0)]
+    assert draft_service.to_trail(draft).route_geometry == [GeoPoint(lat=1.0, lon=2.0)]
+
+
 def test_published_store_roundtrip():
     store = InMemoryPublishedTrailStore()
     trail = draft_service.to_trail(_draft())
