@@ -3,6 +3,31 @@ const WAYPOINTS: [number, number][] = [
   [0.70, 0.66], [0.50, 0.72], [0.34, 0.66],
 ]; // normalized loop, lifted from the mockup route polylines
 
+export function projectStops(
+  stops: { order: number; label: string; lat?: number; lon?: number }[],
+  width: number,
+  height: number,
+): { order: number; label: string; x: number; y: number }[] {
+  const coords = stops.filter((s) => s.lat != null && s.lon != null);
+  if (coords.length === 0) {
+    return stops.map((s, i) => {
+      const [nx, ny] = WAYPOINTS[i % WAYPOINTS.length];
+      return { order: s.order, label: s.label, x: nx * width, y: ny * height };
+    });
+  }
+  const lats = coords.map((s) => s.lat as number);
+  const lons = coords.map((s) => s.lon as number);
+  const minLat = Math.min(...lats), maxLat = Math.max(...lats);
+  const minLon = Math.min(...lons), maxLon = Math.max(...lons);
+  const spanLat = maxLat - minLat || 1, spanLon = maxLon - minLon || 1;
+  const pad = 44;
+  return stops.map((s) => {
+    const x = s.lon != null ? pad + ((s.lon - minLon) / spanLon) * (width - 2 * pad) : width / 2;
+    const y = s.lat != null ? pad + ((maxLat - s.lat) / spanLat) * (height - 2 * pad) : height / 2;
+    return { order: s.order, label: s.label, x, y };
+  });
+}
+
 export function MapCanvas({
   stops,
   activeOrder,
@@ -10,16 +35,13 @@ export function MapCanvas({
   height = 764,
   showUserDot = false,
 }: {
-  stops: { order: number; label: string }[];
+  stops: { order: number; label: string; lat?: number; lon?: number }[];
   activeOrder?: number;
   width?: number;
   height?: number;
   showUserDot?: boolean;
 }) {
-  const pts = stops.map((s, i) => {
-    const [nx, ny] = WAYPOINTS[i % WAYPOINTS.length];
-    return { ...s, x: nx * width, y: ny * height };
-  });
+  const pts = projectStops(stops, width, height);
   const routeD = pts.map((p, i) => `${i ? "L" : "M"}${p.x} ${p.y}`).join(" ") + " Z";
   return (
     <svg viewBox={`0 0 ${width} ${height}`} style={{ width: "100%", height: "100%" }}>
