@@ -38,9 +38,13 @@ function userIcon(): L.DivIcon {
 
 function FitBounds({ points }: { points: [number, number][] }) {
   const map = useMap();
+  // Key on the coordinates' content, not the (freshly-built each render) array
+  // identity — otherwise the effect re-fits on every render and fights the
+  // user's pan/zoom on the live map.
+  const key = points.map((p) => p.join(",")).join(";");
   useEffect(() => {
     if (points.length) map.fitBounds(points, { padding: [30, 30] });
-  }, [map, points]);
+  }, [map, key]); // eslint-disable-line react-hooks/exhaustive-deps
   return null;
 }
 
