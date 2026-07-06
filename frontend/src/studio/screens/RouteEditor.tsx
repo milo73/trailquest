@@ -71,8 +71,8 @@ export function RouteEditor() {
   const withinTolerance = Math.abs(actual - requested) <= 0.15 * requested;
 
   const mapStops = [
-    { order: 0, label: "S" },
-    ...draft.stops.map((s) => ({ order: s.order, label: String(s.order) })),
+    { order: 0, label: "S", lat: draft.start.lat, lon: draft.start.lon },
+    ...draft.stops.map((s) => ({ order: s.order, label: String(s.order), lat: s.poi.location.lat, lon: s.poi.location.lon })),
   ];
 
   async function handleReorder(order: number, dir: "up" | "down") {

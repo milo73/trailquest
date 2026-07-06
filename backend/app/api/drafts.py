@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException
 
+from app.cache import published_trails
 from app.models.schemas import (
     CustomStopRequest,
     DraftCreate,
@@ -107,6 +108,7 @@ def publish_draft(draft_id: str) -> DraftTrail:
             status_code=409,
             detail=f"Kan niet publiceren: {report.blocking} blokkerende issue(s)",
         )
-    updated = draft_service.update(draft_id, DraftUpdate(status=DraftStatus.REVIEW))
-    assert updated is not None  # draft existed above
+    published_trails.put(draft_service.to_trail(draft))
+    updated = draft_service.update(draft_id, DraftUpdate(status=DraftStatus.PUBLISHED))
+    assert updated is not None
     return updated

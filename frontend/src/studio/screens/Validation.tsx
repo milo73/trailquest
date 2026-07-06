@@ -421,31 +421,43 @@ export function Validation() {
             }}
           >
             {published ? (
-              <div
-                style={{
-                  width: "100%",
-                  height: 52,
-                  borderRadius: 14,
-                  background: "#6f8a4f",
-                  color: "#fff",
-                  font: "700 15px/1 var(--tq-sans)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 9,
-                }}
-              >
-                <svg
-                  width="17"
-                  height="17"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="#fff"
-                  strokeWidth="2.4"
+              <div style={{ display: "flex", flexDirection: "column", gap: 10, alignItems: "center" }}>
+                <div
+                  style={{
+                    width: "100%",
+                    height: 52,
+                    borderRadius: 14,
+                    background: "#6f8a4f",
+                    color: "#fff",
+                    font: "700 15px/1 var(--tq-sans)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 9,
+                  }}
                 >
-                  <path d="M5 12l4 4 10-10" />
-                </svg>
-                Verzonden naar moderatie
+                  <svg
+                    width="17"
+                    height="17"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#fff"
+                    strokeWidth="2.4"
+                  >
+                    <path d="M5 12l4 4 10-10" />
+                  </svg>
+                  Gepubliceerd — Live
+                </div>
+                <a
+                  href="/play"
+                  style={{
+                    font: "600 13px/1 var(--tq-sans)",
+                    color: "#aeb9d2",
+                    textDecoration: "underline",
+                  }}
+                >
+                  Speel in de app
+                </a>
               </div>
             ) : !loading && (
               <button
@@ -467,7 +479,7 @@ export function Validation() {
                   boxShadow: !report || report.blocking > 0 ? "none" : "0 12px 24px -12px rgba(0,0,0,.5)",
                 }}
               >
-                Publiceren naar moderatie
+                Publiceren
                 <svg
                   width="17"
                   height="17"
@@ -498,7 +510,7 @@ export function Validation() {
                 color: "#8e9ab8",
               }}
             >
-              Na publicatie volgt steekproefcontrole. Spelers kunnen feiten blijven melden.
+              Direct live na publicatie. Spelers kunnen feiten blijven melden.
             </div>
           </div>
         </div>

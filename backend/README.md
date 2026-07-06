@@ -81,6 +81,13 @@ looks up and writes the store under `stop_id` and sets `Stop.id` to it.
 default `drafts`) persists creator-studio drafts as JSON files in a directory
 across restarts. Default `memory` is in-process and drafts are lost on restart.
 
+**Published-trails store** — `TRAILQUEST_PUBLISHED_STORE=file`
+(+ `TRAILQUEST_PUBLISHED_STORE_PATH`, default `published`) persists published,
+playable trails as JSON files across restarts. Each published trail is an
+**immutable snapshot** with embedded stops (no `content_cache` refs), reusing the
+draft id, so `GET /trails/{draft_id}` plays exactly what was approved. Default
+`memory` is in-process and published trails are lost on restart.
+
 Drafts are stored as lightweight `DraftRecord` objects that hold only
 `stop_refs: list[StopRef]` (each ref is a `stop_id` + `order`) rather than
 embedding full stop content. On every `get` or `list_drafts` call the draft store
@@ -163,9 +170,10 @@ a trail from Haarlem seed stops (content-accuracy: never present non-local POIs 
 | Method | Path | Description |
 |---|---|---|
 | `GET` | `/health` | Liveness check |
-| `POST` | `/trails` | Generate a full trail (route + content) |
-| `GET` | `/trails/{id}` | Fetch a persisted generated trail |
-| `POST` | `/trails/{id}/answer` | Check answer for a stop; body: `stop_order`, `answer`, `attempt`, optional `question_index` (defaults to primary) |
+| `POST` | `/trails` | Generate a full trail (route + content) on demand |
+| `GET` | `/trails` | List published trails (the player browse list) |
+| `GET` | `/trails/{id}` | Fetch a trail; resolves published trails first, then on-demand generated ones |
+| `POST` | `/trails/{id}/answer` | Check answer for a stop; body: `stop_order`, `answer`, `attempt`, optional `question_index` (defaults to primary); resolves published or on-demand trails |
 | `GET` | `/pois` | List candidate POIs near a location (query params: `lat`, `lon`, `distance_km`) |
 | `POST` | `/routes/measure` | Compute walking distance/duration for an ordered list of coordinates |
 | `POST` | `/drafts` | Create a draft trail; optional `place` (geocoded to `start`+`city`; 422 if not found), `start`, `distance_km`, `theme`, `desired_stops`, `from_concept` (generates real POIs + AI content) |
@@ -176,7 +184,7 @@ a trail from Haarlem seed stops (content-accuracy: never present non-local POIs 
 | `POST` | `/drafts/{id}/stops` | Add a custom stop to a draft; body: `name` (string, optional when `source_ref` is given), optional `lat`/`lon` (floats, default to the draft start if omitted), optional `source_ref` (Wikipedia/Wikidata link or bare QID — grounds the stop with Wikidata facts + Wikipedia background via `grounding_service`; degrades to a factless stop on any failure) |
 | `POST` | `/drafts/{id}/stops/{order}/generate` | RAG-generate a grounded story and candidate question from the selected facts; body: `fact_keys` (list of fact key strings to ground the generation) and `tone` (optional string, e.g. `"speels"`) |
 | `GET` | `/drafts/{id}/validation` | Pre-publish validation report: per-stop grounding checks, blocking/warning counts, and `can_publish` (true when `blocking == 0`) |
-| `POST` | `/drafts/{id}/publish` | Re-validates the draft; returns **409** if `blocking > 0`, otherwise sets `status=review` and returns the updated draft |
+| `POST` | `/drafts/{id}/publish` | Self-publish: re-validates the draft; **409** if `blocking > 0`, otherwise snapshots it into a playable `Trail` (same id, immutable, stored in the published-trails registry), sets `status=published`, and returns the updated draft |
 
 ## Status
 
