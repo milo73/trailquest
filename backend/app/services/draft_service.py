@@ -22,7 +22,9 @@ from app.models.schemas import (
     GeoPoint,
     Question,
     Source,
+    Stop,
     StopGrounding,
+    Trail,
     TrailRequest,
     ValidationCheck,
     ValidationResult,
@@ -264,6 +266,35 @@ def validate(draft: DraftTrail) -> ValidationResult:
         blocking=blocking,
         warnings=warnings,
         can_publish=blocking == 0,
+    )
+
+
+def to_trail(draft: DraftTrail) -> Trail:
+    """Snapshot a validated draft into an immutable player Trail (reuses the draft id).
+
+    Call only when ``validate(draft).can_publish`` — completeness (story, ≥1 question,
+    valid primary) is assumed and asserted by the ``Stop`` model."""
+    stops = [
+        Stop(
+            id=s.id,
+            order=s.order,
+            poi=s.poi,
+            story=s.story or "",
+            questions=s.questions,
+            primary_question_index=s.primary_question_index or 0,
+        )
+        for s in draft.stops
+    ]
+    return Trail(
+        id=draft.id,
+        city=draft.city,
+        theme=draft.theme,
+        requested_distance_km=draft.requested_distance_km,
+        actual_distance_km=draft.actual_distance_km,
+        estimated_duration_min=draft.estimated_duration_min,
+        start=draft.start,
+        stops=stops,
+        attributions=draft.attributions,
     )
 
 

@@ -431,3 +431,72 @@ def _build_draft_store() -> DraftStore:
 
 
 drafts: DraftStore = _build_draft_store()
+
+
+class PublishedTrailStore(ABC):
+    """Registry of published, playable trails (immutable snapshots)."""
+
+    @abstractmethod
+    def put(self, trail: Trail) -> None: ...
+    @abstractmethod
+    def get(self, trail_id: str) -> Trail | None: ...
+    @abstractmethod
+    def list_trails(self) -> list[Trail]: ...
+    @abstractmethod
+    def clear(self) -> None: ...
+
+
+class InMemoryPublishedTrailStore(PublishedTrailStore):
+    def __init__(self) -> None:
+        self._trails: dict[str, Trail] = {}
+
+    def put(self, trail: Trail) -> None:
+        self._trails[trail.id] = trail
+
+    def get(self, trail_id: str) -> Trail | None:
+        return self._trails.get(trail_id)
+
+    def list_trails(self) -> list[Trail]:
+        return list(self._trails.values())
+
+    def clear(self) -> None:
+        self._trails.clear()
+
+
+class FilePublishedTrailStore(PublishedTrailStore):
+    """Persist each published trail as ``<id>.json`` (survives restarts)."""
+
+    def __init__(self, dir_path: str) -> None:
+        self._dir = Path(dir_path)
+        self._dir.mkdir(parents=True, exist_ok=True)
+
+    def _path(self, trail_id: str) -> Path:
+        return self._dir / f"{Path(trail_id).name}.json"
+
+    def put(self, trail: Trail) -> None:
+        self._path(trail.id).write_text(trail.model_dump_json(indent=2), encoding="utf-8")
+
+    def get(self, trail_id: str) -> Trail | None:
+        path = self._path(trail_id)
+        if not path.exists():
+            return None
+        return Trail.model_validate_json(path.read_text(encoding="utf-8"))
+
+    def list_trails(self) -> list[Trail]:
+        return [
+            Trail.model_validate_json(f.read_text(encoding="utf-8"))
+            for f in sorted(self._dir.glob("*.json"))
+        ]
+
+    def clear(self) -> None:
+        for f in self._dir.glob("*.json"):
+            f.unlink()
+
+
+def _build_published_store() -> PublishedTrailStore:
+    if settings.published_store == "file":
+        return FilePublishedTrailStore(settings.published_store_path)
+    return InMemoryPublishedTrailStore()
+
+
+published_trails: PublishedTrailStore = _build_published_store()

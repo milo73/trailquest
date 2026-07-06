@@ -52,6 +52,11 @@ class Settings(BaseSettings):
     draft_store: str = "memory"
     draft_store_path: str = "drafts"
 
+    # Published trail store. "memory" (default, tests) is in-process; "file"
+    # persists each published trail as JSON under published_store_path.
+    published_store: str = "memory"
+    published_store_path: str = "published"
+
     # POI / data source (PRD §10). "seed" uses the bundled Haarlem set (offline,
     # used by tests); "live" queries Overpass (OSM) + Wikidata.
     poi_source: str = "seed"

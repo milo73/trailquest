@@ -6,12 +6,16 @@ from app.cache.store import (
     ContentStore,
     DraftStore,
     FileDraftStore,
+    FilePublishedTrailStore,
     InMemoryContentStore,
     InMemoryDraftStore,
+    InMemoryPublishedTrailStore,
+    PublishedTrailStore,
     SqliteContentStore,
     active_trails,
     content_cache,
     drafts,
+    published_trails,
 )
 
 __all__ = [
@@ -20,10 +24,14 @@ __all__ = [
     "ContentStore",
     "DraftStore",
     "FileDraftStore",
+    "FilePublishedTrailStore",
     "InMemoryContentStore",
     "InMemoryDraftStore",
+    "InMemoryPublishedTrailStore",
+    "PublishedTrailStore",
     "SqliteContentStore",
     "active_trails",
     "content_cache",
     "drafts",
+    "published_trails",
 ]
