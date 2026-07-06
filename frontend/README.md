@@ -2,7 +2,7 @@
 
 React + Vite + TypeScript single-page app. Serves two surfaces:
 
-- `/play` — the **player app** (QuesterApp) — wired to the FastAPI backend
+- `/play` — the **player app** (QuesterApp) — lands on a Browse list of published trails (or "Zelf genereren" for on-demand); wired to the FastAPI backend
 - `/studio` — the **creator studio** (StudioApp) — runs on mock data (one real call: "Genereer concept" hits `POST /trails`)
 
 ---
@@ -82,7 +82,7 @@ src/
 │   ├── fonts.ts             font definitions
 │   └── primitives/          shared UI primitives
 │       ├── Button, Card, Chip, Chip, EyebrowLabel
-│       ├── MapCanvas        SVG stand-in for tile map (MVP)
+│       ├── MapCanvas        SVG map (plots real stop coordinates via projectStops; waypoint fallback)
 │       ├── PhoneFrame       chrome wrapper
 │       ├── SegmentedControl
 │       ├── SourceBadge      renders provenance attribution
@@ -99,10 +99,11 @@ src/
 │
 ├── quester/                 player app
 │   ├── gamification.ts      pointsFor, deriveBadges, SolveRecord (client-side)
-│   ├── store.tsx            React context + useReducer — setTrail, goToStop,
-│   │                        recordSolve, arriveAtNextOrFinish, reset
+│   ├── store.tsx            React context + useReducer — setTrail, goToConfigure,
+│   │                        goToStop, recordSolve, arriveAtNextOrFinish, reset
 │   ├── QuesterApp.tsx       router + provider root
 │   └── screens/
+│       ├── Browse.tsx       default landing — lists published trails (GET /trails); "Speel" plays one, "Zelf genereren" → Configure
 │       ├── Configure.tsx    distance / theme picker → generateTrail
 │       ├── Preview.tsx      trail overview before starting
 │       ├── Navigate.tsx     "Ik ben er" arrival screen
@@ -118,7 +119,7 @@ src/
         ├── RouteEditor.tsx  stop list + reorder controls
         ├── StopEditor.tsx   stop detail — content, multi-question list with a "primair (poort)" radio
         │                    (only Type A/D may be primary; Type B forces gate off)
-        └── Validation.tsx   pre-publish validation screen — server-computed report (per-stop grounding, blocking/warning counts, can_publish); "Publiceer" button is disabled while blocking > 0; on success sets the draft to `review`
+        └── Validation.tsx   pre-publish validation screen — server-computed report (per-stop grounding, blocking/warning counts, can_publish); "Publiceren" is disabled while blocking > 0; on success the draft self-publishes to `published` (Live) and a "Speel in de app" link opens the player browse
 ```
 
 ### What is backend-wired vs. client-side / mock
