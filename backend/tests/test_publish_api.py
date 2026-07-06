@@ -41,3 +41,15 @@ def test_answer_resolves_a_published_trail():
         f"/trails/{did}/answer", json={"stop_order": order, "answer": "x", "attempt": 1}
     )
     assert r.status_code == 200  # resolves the published trail (not only active_trails)
+
+
+def test_get_validation_shape():
+    did = _publishable_draft_id()
+    r = client.get(f"/drafts/{did}/validation")
+    assert r.status_code == 200
+    assert {"checks", "per_stop", "blocking", "warnings", "can_publish"} <= set(r.json().keys())
+
+
+def test_publish_and_validation_unknown_are_404():
+    assert client.get("/drafts/nope/validation").status_code == 404
+    assert client.post("/drafts/nope/publish").status_code == 404
