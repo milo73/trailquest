@@ -33,6 +33,7 @@ export interface Trail {
   start: GeoPoint;
   stops: Stop[];
   attributions: string[];
+  route_geometry?: GeoPoint[] | null;
 }
 
 export interface TrailRequest { start: GeoPoint; distance_km: number; theme: Theme; desired_stops?: number; }
@@ -67,6 +68,7 @@ export interface DraftTrail {
   stops: DraftStop[];
   status: DraftStatus;
   attributions: string[];
+  route_geometry?: GeoPoint[] | null;
 }
 
 export interface DraftCreate {
