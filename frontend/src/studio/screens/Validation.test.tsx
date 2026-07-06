@@ -43,20 +43,22 @@ test("renders the real per-stop grounding and disables publish when blocking", a
   expect(await screen.findByText("Mijn plek")).toBeInTheDocument();
   expect(screen.getByText("geen feiten")).toBeInTheDocument();
   expect(within(screen.getByTestId("blocking-count-card")).getByText("1")).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: /Publiceren naar moderatie/i })).toBeDisabled();
+  expect(screen.getByRole("button", { name: /Publiceren/i })).toBeDisabled();
 });
 
-test("a clean report publishes to moderation", async () => {
+test("a clean report publishes directly and shows Speel-in-app link", async () => {
   stub((url) => {
     if (url.endsWith("/validation"))
       return new Response(JSON.stringify(report({ checks: [{ id: "grounding", label: "Grounding", detail: "2 / 2", status: "ok" }], per_stop: [{ order: 1, name: "A", sources: "Wikidata", grounded: true }, { order: 2, name: "B", sources: "Wikidata", grounded: true }], blocking: 0, can_publish: true })), { status: 200 });
     if (url.endsWith("/publish"))
-      return new Response(JSON.stringify({ ...DRAFT, status: "review" }), { status: 200 });
+      return new Response(JSON.stringify({ ...DRAFT, status: "published" }), { status: 200 });
     return new Response(JSON.stringify(DRAFT), { status: 200 });
   });
   render(<MemoryRouter><DraftProvider><Validation /></DraftProvider></MemoryRouter>);
-  const btn = await screen.findByRole("button", { name: /Publiceren naar moderatie/i });
+  const btn = await screen.findByRole("button", { name: /Publiceren/i });
   expect(btn).not.toBeDisabled();
   await userEvent.click(btn);
-  expect(await screen.findByText(/Verzonden naar moderatie/i)).toBeInTheDocument();
+  expect(await screen.findByText(/Gepubliceerd — Live/i)).toBeInTheDocument();
+  const link = screen.getByRole("link", { name: /Speel/i });
+  expect(link).toHaveAttribute("href", "/play");
 });

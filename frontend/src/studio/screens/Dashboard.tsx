@@ -188,7 +188,23 @@ function DraftCard({ draft, onClick }: { draft: DraftTrail; onClick: () => void 
         >
           {draft.status === "concept" && <span>nog niet live</span>}
           {draft.status === "review" && <span>wacht op moderatie</span>}
-          {draft.status === "published" && <span>gepubliceerd</span>}
+          {draft.status === "published" && (
+            <>
+              <span>gepubliceerd</span>
+              <a
+                href="/play"
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  marginLeft: "auto",
+                  font: "600 11px/1 var(--tq-mono)",
+                  color: "#3a5a2f",
+                  textDecoration: "underline",
+                }}
+              >
+                Speel in app
+              </a>
+            </>
+          )}
         </div>
       </div>
     </div>
