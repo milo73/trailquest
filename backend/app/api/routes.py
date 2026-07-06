@@ -12,5 +12,5 @@ router = APIRouter(prefix="/routes", tags=["routes"])
 
 @router.post("/measure", response_model=RouteMeasureResult)
 def measure(req: RouteMeasureRequest) -> RouteMeasureResult:
-    distance_km, duration_min = route_service.measure_loop(req.start, req.points)
+    distance_km, duration_min, _ = route_service.measure_loop(req.start, req.points)
     return RouteMeasureResult(distance_km=distance_km, duration_min=duration_min)

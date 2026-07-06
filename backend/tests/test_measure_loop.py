@@ -3,7 +3,8 @@ from app.services.route_service import measure_loop
 
 
 def test_empty_points_is_zero():
-    assert measure_loop(GeoPoint(lat=52.38, lon=4.63), []) == (0.0, 0)
+    dist, dur, geo = measure_loop(GeoPoint(lat=52.38, lon=4.63), [])
+    assert dist == 0.0 and dur == 0 and geo is None
 
 
 def test_loop_distance_and_duration_increase_with_points():
@@ -18,6 +19,7 @@ def test_loop_distance_and_duration_increase_with_points():
 def test_single_point_loop_is_out_and_back():
     start = GeoPoint(lat=52.380, lon=4.630)
     p = GeoPoint(lat=52.385, lon=4.630)
-    dist, dur = measure_loop(start, [p])
+    dist, dur, geo = measure_loop(start, [p])
     assert dist > 0
     assert isinstance(dur, int)
+    assert geo is None  # haversine fallback → no geometry

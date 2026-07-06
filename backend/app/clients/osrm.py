@@ -56,8 +56,12 @@ def optimized_loop(points: list[tuple[float, float]]) -> TripResult:
     try:
         resp = httpx.get(
             url,
-            params={"source": "first", "roundtrip": "true",
-                    "overview": "full", "geometries": "geojson"},
+            params={
+                "source": "first",
+                "roundtrip": "true",
+                "overview": "full",
+                "geometries": "geojson",
+            },
             timeout=settings.http_timeout,
         )
         resp.raise_for_status()

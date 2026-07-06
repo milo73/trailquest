@@ -208,14 +208,25 @@ def test_osrm_raises_on_non_ok_code(monkeypatch: pytest.MonkeyPatch) -> None:
 
 _OSRM_TRIP = {
     "code": "Ok",
-    "trips": [{"distance": 1234.0, "geometry": {"type": "LineString",
-        "coordinates": [[4.63, 52.38], [4.64, 52.39], [4.65, 52.38]]}}],
+    "trips": [
+        {
+            "distance": 1234.0,
+            "geometry": {
+                "type": "LineString",
+                "coordinates": [[4.63, 52.38], [4.64, 52.39], [4.65, 52.38]],
+            },
+        }
+    ],
     "waypoints": [{"waypoint_index": 0}, {"waypoint_index": 1}, {"waypoint_index": 2}],
 }
 _OSRM_ROUTE = {
     "code": "Ok",
-    "routes": [{"distance": 900.0, "geometry": {"type": "LineString",
-        "coordinates": [[4.63, 52.38], [4.64, 52.39]]}}],
+    "routes": [
+        {
+            "distance": 900.0,
+            "geometry": {"type": "LineString", "coordinates": [[4.63, 52.38], [4.64, 52.39]]},
+        }
+    ],
 }
 
 

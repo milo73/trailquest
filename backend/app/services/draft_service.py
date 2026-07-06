@@ -43,11 +43,12 @@ def _attributions(stops: list[DraftStop]) -> list[str]:
 
 
 def _measure(draft: DraftTrail) -> DraftTrail:
-    distance, duration = route_service.measure_loop(
+    distance, duration, geometry = route_service.measure_loop(
         draft.start, [s.poi.location for s in draft.stops]
     )
     draft.actual_distance_km = distance
     draft.estimated_duration_min = duration
+    draft.route_geometry = geometry
     draft.attributions = _attributions(draft.stops)
     return draft
 
@@ -295,6 +296,7 @@ def to_trail(draft: DraftTrail) -> Trail:
         start=draft.start,
         stops=stops,
         attributions=draft.attributions,
+        route_geometry=draft.route_geometry,
     )
 
 
