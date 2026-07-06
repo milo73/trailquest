@@ -1,4 +1,4 @@
-import { Button, EyebrowLabel, MapCanvas, PhoneFrame } from "../../design-system/primitives";
+import { Button, EyebrowLabel, TileMap, PhoneFrame } from "../../design-system/primitives";
 import { useQuester } from "../store";
 
 export function Navigate() {
@@ -17,17 +17,18 @@ export function Navigate() {
       ? currentStop.poi.facts[0]
       : "Grote Markt · historisch";
 
-  const mapStops = stops.map((stop, i) => ({
-    order: stop.order,
-    label: i === 0 ? "S" : String(stop.order),
-  }));
+  const mapStops = [
+    { order: 0, label: "S", lat: trail.start.lat, lon: trail.start.lon },
+    ...trail.stops.map((s) => ({ order: s.order, label: String(s.order), lat: s.poi.location.lat, lon: s.poi.location.lon })),
+  ];
 
   return (
     <PhoneFrame>
       {/* Full-screen map */}
       <div style={{ position: "absolute", inset: 0 }}>
-        <MapCanvas
+        <TileMap
           stops={mapStops}
+          routeGeometry={trail.route_geometry}
           activeOrder={state.currentOrder}
           showUserDot
         />
