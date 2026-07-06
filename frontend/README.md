@@ -82,7 +82,7 @@ src/
 │   ├── fonts.ts             font definitions
 │   └── primitives/          shared UI primitives
 │       ├── Button, Card, Chip, Chip, EyebrowLabel
-│       ├── MapCanvas        SVG map (plots real stop coordinates via projectStops; waypoint fallback)
+│       ├── TileMap         real Leaflet + OSM tile map (markers + walking-path polyline from route_geometry; react-leaflet mocked in tests)
 │       ├── PhoneFrame       chrome wrapper
 │       ├── SegmentedControl
 │       ├── SourceBadge      renders provenance attribution
@@ -257,7 +257,7 @@ Test files:
 - `src/quester/screens/Preview.test.tsx` (1)
 - `src/quester/screens/Stop.test.tsx` (3)
 - `src/design-system/primitives/Button.test.tsx` (1)
-- `src/design-system/primitives/MapCanvas.test.tsx` (1)
+- `src/design-system/primitives/TileMap.test.tsx` (4)
 - `src/design-system/primitives/SegmentedControl.test.tsx` (1)
 - `src/design-system/primitives/SourceBadge.test.tsx` (2)
 - `src/studio/components/CustomStopForm.test.tsx` (1)

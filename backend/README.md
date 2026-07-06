@@ -108,6 +108,13 @@ content store is empty after restart).
 network and optimizes stop order via OSRM's `trip` service. Without it, a
 haversine straight-line estimate is used.
 
+With OSRM, the trip/route calls request `overview=full&geometries=geojson`, so
+`Trail` and `DraftTrail` carry an optional **`route_geometry`** (`list[GeoPoint] |
+null`) — the actual street-following walking path, which the map draws as the route
+line. On the haversine fallback there is no path, so `route_geometry` is `null` and
+the client draws straight segments between stops. It is a schema field, so the
+file/sqlite/published stores persist it and published snapshots keep their path.
+
 **LLM provider** (`TRAILQUEST_LLM_PROVIDER`):
 
 | Value | Auth | Notes |
