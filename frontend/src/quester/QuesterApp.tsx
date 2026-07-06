@@ -1,4 +1,5 @@
 import { QuesterProvider, useQuester } from "./store";
+import { Browse } from "./screens/Browse";
 import { Configure } from "./screens/Configure";
 import { Preview } from "./screens/Preview";
 import { Navigate } from "./screens/Navigate";
@@ -8,6 +9,7 @@ import { Finish } from "./screens/Finish";
 function Flow() {
   const { state } = useQuester();
   switch (state.phase) {
+    case "browse": return <Browse />;
     case "preview": return <Preview />;
     case "navigate": return <Navigate />;
     case "stop": return <Stop />;

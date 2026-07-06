@@ -13,14 +13,20 @@ test("end-to-end: generate a one-stop trail and finish it", async () => {
     stops: [{ order: 1, story: "s", questions: [{ type: "C", prompt: "Wat denk je?", gates: false }], primary_question_index: 0,
       poi: { id: "p1", name: "Grote Markt", location: { lat: 52.38, lon: 4.63 }, facts: [] } }],
   };
-  const fetchMock = vi.fn((url: string) =>
-    url.endsWith("/answer")
-      ? Promise.resolve(new Response(JSON.stringify({ correct: true, unlocked_next: true, feedback: "Mooi." }), { status: 200 }))
-      : Promise.resolve(new Response(JSON.stringify(trail), { status: 201 })),
-  );
+  const fetchMock = vi.fn((url: string, init?: RequestInit) => {
+    if (url.endsWith("/answer"))
+      return Promise.resolve(new Response(JSON.stringify({ correct: true, unlocked_next: true, feedback: "Mooi." }), { status: 200 }));
+    // GET /trails (list) — return empty so Browse shows no trails
+    if (url.endsWith("/trails") && (!init?.method || init.method === "GET"))
+      return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
+    // POST /trails (create) and other calls
+    return Promise.resolve(new Response(JSON.stringify(trail), { status: 201 }));
+  });
   vi.stubGlobal("fetch", fetchMock);
 
   render(<MemoryRouter initialEntries={["/play"]}><QuesterApp /></MemoryRouter>);
+  // app lands on Browse; navigate to Configure first
+  await userEvent.click(await screen.findByRole("button", { name: /Zelf genereren/i }));
   await userEvent.click(screen.getByRole("button", { name: /Genereer speurtocht/i }));
   await userEvent.click(await screen.findByRole("button", { name: /Start speurtocht/i }));
   await userEvent.type(screen.getByPlaceholderText(/antwoord/i), "iets");
