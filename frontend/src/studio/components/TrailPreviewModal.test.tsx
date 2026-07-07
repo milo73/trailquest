@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { expect, test } from "vitest";
+import { expect, test, vi } from "vitest";
 import { TrailPreviewModal } from "./TrailPreviewModal";
 import type { DraftTrail } from "../../api/types";
 
