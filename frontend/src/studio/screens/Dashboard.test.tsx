@@ -57,6 +57,78 @@ test("clicking a real draft card calls GET /api/drafts/:id (loadDraft)", async (
   expect(getDraftCall).toBeTruthy();
 });
 
+test("delete draft: Annuleren keeps the card and issues no DELETE", async () => {
+  const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify([DRAFT_D1]), { status: 200 }));
+  vi.stubGlobal("fetch", fetchMock);
+
+  render(<MemoryRouter><DraftProvider><Dashboard /></DraftProvider></MemoryRouter>);
+
+  // Wait for the draft card
+  await screen.findByText("Mijn nieuwe tocht");
+
+  // Click the Verwijderen button (ghost button on the card, not a modal button yet)
+  const deleteBtn = screen.getByRole("button", { name: "Verwijderen" });
+  await userEvent.click(deleteBtn);
+
+  // Dialog should appear
+  expect(screen.getByRole("dialog", { name: "Tocht verwijderen" })).toBeInTheDocument();
+
+  // Click Annuleren
+  await userEvent.click(screen.getByRole("button", { name: "Annuleren" }));
+
+  // Dialog gone, card still there
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(screen.getByText("Mijn nieuwe tocht")).toBeInTheDocument();
+
+  // No DELETE request fired
+  const deleteCalls = fetchMock.mock.calls.filter((c) => c[1]?.method === "DELETE");
+  expect(deleteCalls).toHaveLength(0);
+});
+
+test("delete draft: confirm Verwijderen issues DELETE and removes the card", async () => {
+  const fetchMock = vi.fn((_url: string, init?: RequestInit) => {
+    if (init?.method === "DELETE") {
+      return Promise.resolve(new Response(null, { status: 204 }));
+    }
+    // After deletion, listDrafts returns []
+    return Promise.resolve(new Response(JSON.stringify([DRAFT_D1]), { status: 200 }));
+  });
+  vi.stubGlobal("fetch", fetchMock);
+
+  render(<MemoryRouter><DraftProvider><Dashboard /></DraftProvider></MemoryRouter>);
+
+  await screen.findByText("Mijn nieuwe tocht");
+
+  // Open delete dialog
+  const deleteBtn = screen.getByRole("button", { name: "Verwijderen" });
+  await userEvent.click(deleteBtn);
+  expect(screen.getByRole("dialog", { name: "Tocht verwijderen" })).toBeInTheDocument();
+
+  // After confirm, listDrafts returns []
+  fetchMock.mockImplementation((_url: string, init?: RequestInit) => {
+    if (init?.method === "DELETE") {
+      return Promise.resolve(new Response(null, { status: 204 }));
+    }
+    return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
+  });
+
+  // Confirm deletion (click the modal's confirm button)
+  const confirmBtns = screen.getAllByRole("button", { name: "Verwijderen" });
+  // The confirm button in the dialog is the last one (or we pick from the dialog)
+  const dialog = screen.getByRole("dialog", { name: "Tocht verwijderen" });
+  const confirmBtn = dialog.querySelector("button[style*='#b5453a']") as HTMLElement
+    ?? confirmBtns[confirmBtns.length - 1];
+  await userEvent.click(confirmBtn);
+
+  // DELETE /api/drafts/d1 must have been called
+  const deleteCalls = fetchMock.mock.calls.filter((c: unknown[]) => (c[1] as RequestInit | undefined)?.method === "DELETE");
+  expect(deleteCalls).toHaveLength(1);
+  expect(deleteCalls[0][0]).toBe("/api/drafts/d1");
+
+  // Card should disappear
+  expect(screen.queryByText("Mijn nieuwe tocht")).not.toBeInTheDocument();
+});
+
 test("Nieuwe tocht maken opens the form and generates a concept", async () => {
   const created = {
     id: "d1", title: "t", city: "Bloemendaal", theme: "nature",

@@ -7,6 +7,84 @@ import { useDraft } from "../draftStore";
 import type { DraftCreate, DraftTrail } from "../../api/types";
 import { NewTrailForm } from "../components/NewTrailForm";
 
+function DeleteConfirmDialog({ onConfirm, onCancel }: { onConfirm: () => void; onCancel: () => void }) {
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        onClick={onCancel}
+        style={{
+          position: "fixed",
+          inset: 0,
+          background: "rgba(33, 31, 27, 0.45)",
+          zIndex: 200,
+        }}
+      />
+      {/* Dialog */}
+      <div
+        role="dialog"
+        aria-label="Tocht verwijderen"
+        style={{
+          position: "fixed",
+          top: "50%",
+          left: "50%",
+          transform: "translate(-50%, -50%)",
+          zIndex: 201,
+          width: 380,
+          maxWidth: "calc(100vw - 32px)",
+          background: "var(--tq-paper, #fdfbf6)",
+          border: "1px solid var(--tq-border, #e6dcc6)",
+          borderRadius: 14,
+          boxShadow: "0 8px 32px rgba(0,0,0,0.14)",
+          padding: "28px 24px 24px",
+          display: "flex",
+          flexDirection: "column",
+          gap: 20,
+        }}
+      >
+        <div style={{ font: "600 16px/1.3 var(--tq-sans, sans-serif)", color: "#283a5e" }}>
+          Tocht verwijderen?
+        </div>
+        <div style={{ font: "400 14px/1.5 var(--tq-sans, sans-serif)", color: "#6b6256" }}>
+          Dit kan niet ongedaan worden.
+        </div>
+        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+          <button
+            onClick={onCancel}
+            style={{
+              height: 38,
+              padding: "0 16px",
+              borderRadius: 8,
+              border: "1px solid #e0d5bf",
+              background: "transparent",
+              font: "600 13px/1 var(--tq-sans, sans-serif)",
+              color: "#6b6256",
+              cursor: "pointer",
+            }}
+          >
+            Annuleren
+          </button>
+          <button
+            onClick={onConfirm}
+            style={{
+              height: 38,
+              padding: "0 16px",
+              borderRadius: 8,
+              border: "none",
+              background: "#b5453a",
+              font: "600 13px/1 var(--tq-sans, sans-serif)",
+              color: "#fff",
+              cursor: "pointer",
+            }}
+          >
+            Verwijderen
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}
+
 function formatKm(km: number): string {
   return km.toFixed(1).replace(".", ",");
 }
@@ -142,7 +220,7 @@ function TrailCard({ trail, onClick }: { trail: StudioTrailCard; onClick: () => 
   );
 }
 
-function DraftCard({ draft, onClick }: { draft: DraftTrail; onClick: () => void }) {
+function DraftCard({ draft, onClick, onDelete }: { draft: DraftTrail; onClick: () => void; onDelete: () => void }) {
   return (
     <div
       onClick={onClick}
@@ -152,6 +230,7 @@ function DraftCard({ draft, onClick }: { draft: DraftTrail; onClick: () => void 
         borderRadius: 14,
         overflow: "hidden",
         cursor: "pointer",
+        position: "relative",
       }}
     >
       {/* Map thumbnail */}
@@ -205,6 +284,21 @@ function DraftCard({ draft, onClick }: { draft: DraftTrail; onClick: () => void 
               </a>
             </>
           )}
+          <button
+            aria-label="Verwijderen"
+            onClick={(e) => { e.stopPropagation(); onDelete(); }}
+            style={{
+              marginLeft: "auto",
+              border: "none",
+              background: "transparent",
+              cursor: "pointer",
+              font: "500 11px/1 var(--tq-mono)",
+              color: "#b5453a",
+              padding: 0,
+            }}
+          >
+            Verwijderen
+          </button>
         </div>
       </div>
     </div>
@@ -213,15 +307,20 @@ function DraftCard({ draft, onClick }: { draft: DraftTrail; onClick: () => void 
 
 export function Dashboard() {
   const navigate = useNavigate();
-  const { createDraft, loadDraft } = useDraft();
+  const { createDraft, loadDraft, removeDraft } = useDraft();
   const [realDrafts, setRealDrafts] = useState<DraftTrail[]>([]);
   const [creating, setCreating] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
-  useEffect(() => {
+  function refreshDrafts() {
     listDrafts()
       .then((drafts) => setRealDrafts(drafts))
       .catch(() => setRealDrafts([]));
+  }
+
+  useEffect(() => {
+    refreshDrafts();
   }, []);
 
   const openDraft = useCallback(async (id: string) => {
@@ -306,6 +405,7 @@ export function Dashboard() {
               key={draft.id}
               draft={draft}
               onClick={() => openDraft(draft.id)}
+              onDelete={() => setDeleteTargetId(draft.id)}
             />
           ))}
 
@@ -364,6 +464,17 @@ export function Dashboard() {
           submitting={creating}
           onClose={() => setModalOpen(false)}
           onSubmit={handleGenerate}
+        />
+      )}
+      {deleteTargetId && (
+        <DeleteConfirmDialog
+          onCancel={() => setDeleteTargetId(null)}
+          onConfirm={async () => {
+            const id = deleteTargetId;
+            setDeleteTargetId(null);
+            await removeDraft(id);
+            refreshDrafts();
+          }}
         />
       )}
     </StudioChrome>

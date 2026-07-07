@@ -41,3 +41,6 @@ export const getValidation = (draftId: string) =>
 
 export const publishDraft = (draftId: string) =>
   apiFetch<DraftTrail>(`/drafts/${draftId}/publish`, { method: "POST" });
+
+export const deleteDraft = (id: string) =>
+  apiFetch<void>(`/drafts/${id}`, { method: "DELETE" });

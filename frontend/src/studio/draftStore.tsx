@@ -1,5 +1,5 @@
 import { createContext, useContext, useMemo, useState } from "react";
-import { createDraft as apiCreate, createCustomStop, getDraft, updateDraft, updateStopContent, generateStopContent as apiGenerateStopContent } from "../api/drafts";
+import { createDraft as apiCreate, createCustomStop, deleteDraft as apiDeleteDraft, getDraft, updateDraft, updateStopContent, generateStopContent as apiGenerateStopContent } from "../api/drafts";
 import type { CustomStopRequest, DraftCreate, DraftStop, DraftTrail, POI, StopContentUpdate, StopGenerateRequest, StopGenerateResult } from "../api/types";
 
 const STORAGE_KEY = "tq.studio.draft";
@@ -19,6 +19,7 @@ interface DraftApi {
   generateStopContent: (order: number, body: StopGenerateRequest) => Promise<StopGenerateResult>;
   renameDraft: (title: string) => Promise<void>;
   addCustomStop: (body: CustomStopRequest) => Promise<void>;
+  removeDraft: (id: string) => Promise<void>;
 }
 
 const Ctx = createContext<DraftApi | null>(null);
@@ -118,6 +119,13 @@ export function DraftProvider({ children }: { children: React.ReactNode }) {
           setDraft(saved);
         } finally {
           setSaving(false);
+        }
+      },
+      removeDraft: async (id) => {
+        await apiDeleteDraft(id);
+        if (draft?.id === id) {
+          setDraft(undefined);
+          localStorage.removeItem(ACTIVE_KEY);
         }
       },
     };
