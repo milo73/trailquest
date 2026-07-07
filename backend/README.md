@@ -186,7 +186,8 @@ a trail from Haarlem seed stops (content-accuracy: never present non-local POIs 
 | `POST` | `/drafts` | Create a draft trail; optional `place` (geocoded to `start`+`city`; 422 if not found), `start`, `distance_km`, `theme`, `desired_stops`, `from_concept` (generates real POIs + AI content) |
 | `GET` | `/drafts` | List all draft trails |
 | `GET` | `/drafts/{id}` | Fetch a single draft trail |
-| `PUT` | `/drafts/{id}` | Update a draft trail (title, stops, status, etc.) |
+| `PUT` | `/drafts/{id}` | Update a draft trail (title, theme, stops, status, etc.) |
+| `DELETE` | `/drafts/{id}` | Delete a draft (**204**; 404 unknown). Shared stop content and published snapshots are untouched — a published trail stays playable |
 | `PUT` | `/drafts/{id}/stops/{order}` | Save a stop's story, questions list, and primary_question_index; returns 422 if the primary question is a gating type (A or D) with no stored answer |
 | `POST` | `/drafts/{id}/stops` | Add a custom stop to a draft; body: `name` (string, optional when `source_ref` is given), optional `lat`/`lon` (floats, default to the draft start if omitted), optional `source_ref` (Wikipedia/Wikidata link or bare QID — grounds the stop with Wikidata facts + Wikipedia background via `grounding_service`; degrades to a factless stop on any failure) |
 | `POST` | `/drafts/{id}/stops/{order}/generate` | RAG-generate a grounded story and candidate question from the selected facts; body: `fact_keys` (list of fact key strings to ground the generation) and `tone` (optional string, e.g. `"speels"`) |

@@ -1,6 +1,6 @@
 import { createContext, useContext, useMemo, useState } from "react";
-import { createDraft as apiCreate, createCustomStop, getDraft, updateDraft, updateStopContent, generateStopContent as apiGenerateStopContent } from "../api/drafts";
-import type { CustomStopRequest, DraftCreate, DraftStop, DraftTrail, POI, StopContentUpdate, StopGenerateRequest, StopGenerateResult } from "../api/types";
+import { createDraft as apiCreate, createCustomStop, deleteDraft as apiDeleteDraft, getDraft, updateDraft, updateStopContent, generateStopContent as apiGenerateStopContent } from "../api/drafts";
+import type { CustomStopRequest, DraftCreate, DraftStop, DraftTrail, POI, StopContentUpdate, StopGenerateRequest, StopGenerateResult, Theme } from "../api/types";
 
 const STORAGE_KEY = "tq.studio.draft";
 const ACTIVE_KEY = "tq.studio.activeStop";
@@ -11,14 +11,16 @@ interface DraftApi {
   saving: boolean;
   createDraft: (req: DraftCreate) => Promise<DraftTrail>;
   loadDraft: (id: string) => Promise<void>;
-  addStop: (poi: POI) => Promise<void>;
+  addStop: (poi: POI, insertAfter?: number) => Promise<void>;
   removeStop: (order: number) => Promise<void>;
   reorder: (order: number, dir: "up" | "down") => Promise<void>;
   setActiveStop: (order: number) => void;
   saveStopContent: (order: number, content: StopContentUpdate) => Promise<void>;
   generateStopContent: (order: number, body: StopGenerateRequest) => Promise<StopGenerateResult>;
   renameDraft: (title: string) => Promise<void>;
-  addCustomStop: (body: CustomStopRequest) => Promise<void>;
+  setTheme: (theme: Theme) => Promise<void>;
+  addCustomStop: (body: CustomStopRequest, insertAfter?: number) => Promise<void>;
+  removeDraft: (id: string) => Promise<void>;
 }
 
 const Ctx = createContext<DraftApi | null>(null);
@@ -63,9 +65,27 @@ export function DraftProvider({ children }: { children: React.ReactNode }) {
         setDraft(loaded);
         localStorage.setItem(STORAGE_KEY, loaded.id);
       },
-      addStop: async (poi) => {
+      addStop: async (poi, insertAfter) => {
         if (!draft) return;
-        const next = { ...draft, stops: renumber([...draft.stops, { id: "", order: 0, poi, questions: [] }]) };
+        const newStop = { id: "", order: 0, poi, questions: [] };
+        let nextStops: DraftStop[];
+        if (insertAfter === undefined) {
+          nextStops = [...draft.stops, newStop];
+        } else {
+          // insertAfter === 0 means insert at the beginning (after the start point)
+          const insertIdx = draft.stops.findIndex((s) => s.order === insertAfter);
+          if (insertIdx === -1) {
+            // insertAfter === 0 means before all stops
+            nextStops = [newStop, ...draft.stops];
+          } else {
+            nextStops = [
+              ...draft.stops.slice(0, insertIdx + 1),
+              newStop,
+              ...draft.stops.slice(insertIdx + 1),
+            ];
+          }
+        }
+        const next = { ...draft, stops: renumber(nextStops) };
         await save(next);
       },
       removeStop: async (order) => {
@@ -110,14 +130,61 @@ export function DraftProvider({ children }: { children: React.ReactNode }) {
           setSaving(false);
         }
       },
-      addCustomStop: async (body) => {
+      setTheme: async (theme) => {
         if (!draft) return;
         setSaving(true);
         try {
-          const saved = await createCustomStop(draft.id, body);
+          const saved = await updateDraft(draft.id, { theme });
           setDraft(saved);
         } finally {
           setSaving(false);
+        }
+      },
+      addCustomStop: async (body, insertAfter) => {
+        if (!draft) return;
+        setSaving(true);
+        try {
+          // Backend appends the new stop at the end
+          const saved = await createCustomStop(draft.id, body);
+          if (insertAfter === undefined || saved.stops.length === 0) {
+            setDraft(saved);
+            return;
+          }
+          // The new stop is the last one; check if it's already in the right position
+          const lastStop = saved.stops[saved.stops.length - 1];
+          const insertIdx = saved.stops.findIndex((s) => s.order === insertAfter);
+          // If insertAfter === 0, insert at beginning; otherwise after found index
+          const targetIdx = insertAfter === 0 ? 0 : insertIdx + 1;
+          const alreadyInPosition = saved.stops.length - 1 === targetIdx;
+          if (alreadyInPosition || (insertAfter !== 0 && insertIdx === -1)) {
+            setDraft(saved);
+            return;
+          }
+          // Reorder: move last stop to the target position
+          const withoutLast = saved.stops.slice(0, saved.stops.length - 1);
+          const reordered = [
+            ...withoutLast.slice(0, targetIdx),
+            lastStop,
+            ...withoutLast.slice(targetIdx),
+          ];
+          const reorderedDraft = { ...saved, stops: renumber(reordered) };
+          setDraft(reorderedDraft); // optimistic
+          const finalSaved = await updateDraft(saved.id, { stop_poi_ids: reorderedDraft.stops.map((s) => s.poi.id) });
+          setDraft(finalSaved);
+        } finally {
+          setSaving(false);
+        }
+      },
+      removeDraft: async (id) => {
+        await apiDeleteDraft(id);
+        if (draft?.id === id) {
+          setDraft(undefined);
+          localStorage.removeItem(ACTIVE_KEY);
+        }
+        // Always drop the persisted draft id when it points at the deleted
+        // draft — otherwise a reload tries to load a 404.
+        if (localStorage.getItem(STORAGE_KEY) === id) {
+          localStorage.removeItem(STORAGE_KEY);
         }
       },
     };

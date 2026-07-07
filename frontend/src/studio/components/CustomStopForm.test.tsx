@@ -8,5 +8,5 @@ test("submitting a Wikipedia/Wikidata link includes source_ref and allows an emp
   render(<CustomStopForm start={{ lat: 52.38, lon: 4.63 }} onSubmit={onSubmit} onClose={() => {}} />);
   await userEvent.type(screen.getByLabelText(/link of qid/i), "Q42");
   await userEvent.click(screen.getByRole("button", { name: /Toevoegen/i }));
-  expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ source_ref: "Q42" }));
+  expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ source_ref: "Q42" }), undefined);
 });

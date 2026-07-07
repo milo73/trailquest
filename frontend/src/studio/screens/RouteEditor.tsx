@@ -7,6 +7,9 @@ import { Chip } from "../../design-system/primitives/Chip";
 import { useDraft } from "../draftStore";
 import { PoiPicker } from "../components/PoiPicker";
 import { CustomStopForm } from "../components/CustomStopForm";
+import { TrailPreviewModal } from "../components/TrailPreviewModal";
+import { THEME_LABELS } from "../themeLabels";
+import type { Theme } from "../../api/types";
 
 function formatKm(km: number): string {
   return km.toFixed(1).replace(".", ",");
@@ -22,7 +25,8 @@ function formatDuration(min: number): string {
 
 export function RouteEditor() {
   const navigate = useNavigate();
-  const { draft, addStop, removeStop, reorder, setActiveStop, createDraft, loadDraft, addCustomStop, renameDraft, saving } = useDraft();
+  const { draft, addStop, removeStop, reorder, setActiveStop, createDraft, loadDraft, addCustomStop, renameDraft, setTheme, saving } = useDraft();
+  const [showPreview, setShowPreview] = useState(false);
   const [addMode, setAddMode] = useState<null | "menu" | "catalog" | "custom">(null);
   const [busy, setBusy] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -93,20 +97,20 @@ export function RouteEditor() {
     }
   }
 
-  async function handleAddStop(poi: Parameters<typeof addStop>[0]) {
+  async function handleAddStop(poi: Parameters<typeof addStop>[0], insertAfter?: number) {
     setBusy(true);
     try {
-      await addStop(poi);
+      await addStop(poi, insertAfter);
     } finally {
       setBusy(false);
     }
     setAddMode(null);
   }
 
-  async function handleAddCustomStop(body: Parameters<typeof addCustomStop>[0]) {
+  async function handleAddCustomStop(body: Parameters<typeof addCustomStop>[0], insertAfter?: number) {
     setBusy(true);
     try {
-      await addCustomStop(body);
+      await addCustomStop(body, insertAfter);
     } finally {
       setBusy(false);
     }
@@ -136,6 +140,7 @@ export function RouteEditor() {
       actions={
         <div style={{ display: "flex", gap: 9, alignItems: "center" }}>
           <button
+            onClick={() => setShowPreview(true)}
             style={{
               height: 40,
               padding: "0 16px",
@@ -248,7 +253,33 @@ export function RouteEditor() {
                 <line x1="9" y1="9.5" x2="9" y2="19" />
                 <line x1="15" y1="9.5" x2="15" y2="19" />
               </svg>
-              Historisch
+              <select
+                aria-label="Thema"
+                value={draft.theme}
+                onChange={(e) => setTheme(e.target.value as Theme)}
+                style={{
+                  border: "none",
+                  background: "transparent",
+                  font: "600 11px/1 var(--tq-sans)",
+                  color: "#963a30",
+                  cursor: "pointer",
+                  outline: "none",
+                  padding: 0,
+                }}
+              >
+                {(Object.entries(THEME_LABELS) as [Theme, string][]).map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
+            </div>
+            <div
+              style={{
+                marginTop: 6,
+                font: "400 11px/1.4 var(--tq-sans)",
+                color: "#8a7f6d",
+              }}
+            >
+              Bestaande verhalen veranderen pas na opnieuw genereren.
             </div>
             <div style={{ display: "flex", gap: 18, marginTop: 16 }}>
               <div>
@@ -756,6 +787,7 @@ export function RouteEditor() {
           excludeIds={draft.stops.map((s) => s.poi.id)}
           onPick={handleAddStop}
           onClose={() => setAddMode(null)}
+          stops={draft.stops.map((s) => ({ order: s.order, name: s.poi.name }))}
         />
       )}
 
@@ -763,9 +795,15 @@ export function RouteEditor() {
       {addMode === "custom" && (
         <CustomStopForm
           start={draft.start}
-          onSubmit={(body) => { handleAddCustomStop(body); }}
+          onSubmit={(body, insertAfter) => { handleAddCustomStop(body, insertAfter); }}
           onClose={() => setAddMode(null)}
+          stops={draft.stops.map((s) => ({ order: s.order, name: s.poi.name }))}
         />
+      )}
+
+      {/* TrailPreviewModal */}
+      {showPreview && draft && (
+        <TrailPreviewModal draft={draft} onClose={() => setShowPreview(false)} />
       )}
     </StudioChrome>
   );

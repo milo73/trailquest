@@ -25,7 +25,7 @@ test("lists candidates (excluding already-added) and picks one", async () => {
   expect(screen.getByText(/geen feiten/i)).toBeInTheDocument(); // Vleeshal has no facts
 
   await userEvent.click(screen.getByText("Stadhuis"));
-  expect(onPick).toHaveBeenCalledWith(pois[0]);
+  expect(onPick).toHaveBeenCalledWith(pois[0], undefined);
 });
 
 test("shows a loading state before the POI fetch resolves", async () => {
@@ -39,4 +39,42 @@ test("shows an error message when the POI fetch fails", async () => {
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("nope", { status: 500 })));
   render(<PoiPicker start={{ lat: 52.38, lon: 4.63 }} excludeIds={[]} onPick={() => {}} onClose={() => {}} />);
   expect(await screen.findByText(/Kon POI's niet laden/i)).toBeInTheDocument();
+});
+
+test("renders 'Invoegen na' select with stop options when stops prop is provided", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify([]), { status: 200 })));
+  const stops = [
+    { order: 1, name: "Stadhuis" },
+    { order: 2, name: "Vleeshal" },
+  ];
+  render(
+    <PoiPicker
+      start={{ lat: 52.38, lon: 4.63 }}
+      excludeIds={[]}
+      onPick={() => {}}
+      onClose={() => {}}
+      stops={stops}
+    />,
+  );
+
+  const select = screen.getByRole("combobox", { name: /invoegen na/i });
+  expect(select).toBeInTheDocument();
+  expect(screen.getByRole("option", { name: /einde/i })).toBeInTheDocument();
+  expect(screen.getByRole("option", { name: /begin \(na start\)/i })).toBeInTheDocument();
+  expect(screen.getByRole("option", { name: /na stop 1 — stadhuis/i })).toBeInTheDocument();
+  expect(screen.getByRole("option", { name: /na stop 2 — vleeshal/i })).toBeInTheDocument();
+});
+
+test("'Invoegen na' select is not shown when stops prop is omitted", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify([]), { status: 200 })));
+  render(
+    <PoiPicker
+      start={{ lat: 52.38, lon: 4.63 }}
+      excludeIds={[]}
+      onPick={() => {}}
+      onClose={() => {}}
+    />,
+  );
+
+  expect(screen.queryByRole("combobox", { name: /invoegen na/i })).not.toBeInTheDocument();
 });

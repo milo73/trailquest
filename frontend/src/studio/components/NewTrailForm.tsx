@@ -1,20 +1,12 @@
 import { useState } from "react";
 import type { DraftCreate, Theme } from "../../api/types";
+import { THEME_LABELS } from "../themeLabels";
 
 interface Props {
   submitting: boolean;
   onClose: () => void;
   onSubmit: (req: DraftCreate) => Promise<void>;
 }
-
-const THEME_OPTIONS: { value: Theme; label: string }[] = [
-  { value: "historical", label: "Historisch" },
-  { value: "hidden_gems", label: "Verborgen parels" },
-  { value: "family", label: "Familie" },
-  { value: "architecture", label: "Architectuur" },
-  { value: "nature", label: "Natuur" },
-  { value: "mixed", label: "Gemengd" },
-];
 
 export function NewTrailForm({ submitting, onClose, onSubmit }: Props) {
   const [place, setPlace] = useState("");
@@ -192,7 +184,7 @@ export function NewTrailForm({ submitting, onClose, onSubmit }: Props) {
                 outline: "none",
               }}
             >
-              {THEME_OPTIONS.map(({ value, label }) => (
+              {(Object.entries(THEME_LABELS) as [Theme, string][]).map(([value, label]) => (
                 <option key={value} value={value}>
                   {label}
                 </option>
