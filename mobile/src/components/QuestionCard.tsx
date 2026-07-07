@@ -51,7 +51,8 @@ export function QuestionCard({
     );
   }
 
-  if (result != null) {
+  // Terminal: correct answer, or backend revealed after max attempts, or honor-system through
+  if (result?.unlocked_next) {
     return (
       <Card style={styles.card}>
         <Text style={styles.prompt}>{question.prompt}</Text>
@@ -67,9 +68,13 @@ export function QuestionCard({
     );
   }
 
+  // Input view: no result yet, OR a non-terminal wrong result (show inline feedback so user can retry)
   return (
     <Card style={styles.card}>
       <Text style={styles.prompt}>{question.prompt}</Text>
+      {result != null && (
+        <Text style={styles.inlineFeedback}>{result.feedback}</Text>
+      )}
       <TextInput
         style={styles.input}
         placeholder="Jouw antwoord"
@@ -83,7 +88,7 @@ export function QuestionCard({
           onPress={handleSubmit}
           disabled={submitting}
         />
-        {question.hint && question.gates && (
+        {question.hint && (
           <AppButton
             title="Hint"
             variant="ghost"
@@ -133,6 +138,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.terracotta,
     fontStyle: "italic",
+  },
+  inlineFeedback: {
+    fontSize: 14,
+    color: colors.terracottaDeep,
+    fontStyle: "italic",
+    marginBottom: spacing(0.5),
   },
   resultContainer: {
     gap: spacing(0.5),

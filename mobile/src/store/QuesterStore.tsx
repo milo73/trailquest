@@ -72,7 +72,14 @@ function reducer(state: QuesterState, action: Action): QuesterState {
     case "RESET":
       return { ...DEFAULT_STATE };
     case "HYDRATE":
-      return action.state;
+      // Only restore persisted state when the user hasn't acted yet (still on
+      // the default browse screen with no trail loaded). This prevents a
+      // race where the async storage read completes after the user has already
+      // started navigating, clobbering live state.
+      if (state.phase === "browse" && state.trail == null) {
+        return action.state;
+      }
+      return state;
     default:
       return state;
   }
@@ -93,7 +100,6 @@ const QuesterContext = createContext<QuesterContextValue | null>(null);
 export function QuesterProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(reducer, DEFAULT_STATE);
   const isFirstRender = useRef(true);
-  const hasMounted = useRef(false);
 
   // Hydrate from AsyncStorage on mount
   useEffect(() => {
@@ -107,7 +113,6 @@ export function QuesterProvider({ children }: { children: React.ReactNode }) {
         // ignore corrupt data
       }
     });
-    hasMounted.current = true;
     return () => {
       cancelled = true;
     };

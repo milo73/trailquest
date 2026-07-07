@@ -120,6 +120,73 @@ test('type an answer + press "Controleer" → "Volgende" appears', async () => {
   });
 });
 
+test('wrong answer keeps input visible; 3rd wrong answer reveals and shows "Volgende"', async () => {
+  // Mock: attempts 1 & 2 return wrong non-terminal; attempt 3 reveals
+  const submitMock = trailsApi.submitAnswer as jest.Mock;
+  submitMock
+    .mockResolvedValueOnce({ correct: false, unlocked_next: false, feedback: "Net niet." })
+    .mockResolvedValueOnce({ correct: false, unlocked_next: false, feedback: "Net niet." })
+    .mockResolvedValueOnce({
+      correct: false,
+      unlocked_next: true,
+      revealed_answer: "78",
+      feedback: "Het antwoord was: 78.",
+    });
+
+  await renderInStopPhase();
+
+  await waitFor(() => {
+    expect(screen.getByText("Wanneer gebouwd?")).toBeTruthy();
+  });
+
+  // Attempt 1 — wrong answer; input must survive
+  await act(async () => {
+    fireEvent.changeText(screen.getByPlaceholderText("Jouw antwoord"), "1300");
+  });
+  await act(async () => {
+    fireEvent.press(screen.getByText("Controleer"));
+  });
+  await waitFor(() => {
+    // Inline feedback visible
+    expect(screen.getByText("Net niet.")).toBeTruthy();
+  });
+  // Input is still there so user can retry (no freeze)
+  expect(screen.getByPlaceholderText("Jouw antwoord")).toBeTruthy();
+  expect(screen.getByText("Controleer")).toBeTruthy();
+  // "Volgende" must NOT appear yet
+  expect(screen.queryByText("Volgende")).toBeNull();
+
+  // Attempt 2 — wrong answer again
+  await act(async () => {
+    fireEvent.changeText(screen.getByPlaceholderText("Jouw antwoord"), "1350");
+  });
+  await act(async () => {
+    fireEvent.press(screen.getByText("Controleer"));
+  });
+  await waitFor(() => {
+    expect(screen.getByText("Net niet.")).toBeTruthy();
+  });
+  expect(screen.getByPlaceholderText("Jouw antwoord")).toBeTruthy();
+  expect(screen.queryByText("Volgende")).toBeNull();
+
+  // Attempt 3 — backend reveals the answer
+  await act(async () => {
+    fireEvent.changeText(screen.getByPlaceholderText("Jouw antwoord"), "1111");
+  });
+  await act(async () => {
+    fireEvent.press(screen.getByText("Controleer"));
+  });
+  await waitFor(() => {
+    expect(screen.getByText("Het antwoord was: 78.")).toBeTruthy();
+  });
+  // Revealed answer shown
+  expect(screen.getByText("Antwoord: 78")).toBeTruthy();
+  // Input is gone — terminal view
+  expect(screen.queryByPlaceholderText("Jouw antwoord")).toBeNull();
+  // "Volgende" appears
+  expect(screen.getByText("Volgende")).toBeTruthy();
+});
+
 test('pressing "Volgende" advances the phase', async () => {
   await renderInStopPhase();
 
