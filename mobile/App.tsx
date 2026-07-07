@@ -1,12 +1,25 @@
-import { StatusBar } from "expo-status-bar";
-import { Text, View } from "react-native";
-import { colors } from "./src/theme";
+import { QuesterProvider, useQuester } from "./src/store/QuesterStore";
+import { BrowseScreen } from "./src/screens/BrowseScreen";
+import { PreviewScreen } from "./src/screens/PreviewScreen";
+import { NavigateScreen } from "./src/screens/NavigateScreen";
+import { StopScreen } from "./src/screens/StopScreen";
+import { FinishScreen } from "./src/screens/FinishScreen";
+
+function Flow() {
+  const { state } = useQuester();
+  switch (state.phase) {
+    case "preview": return <PreviewScreen />;
+    case "navigate": return <NavigateScreen />;
+    case "stop": return <StopScreen />;
+    case "finish": return <FinishScreen />;
+    default: return <BrowseScreen />;
+  }
+}
 
 export default function App() {
   return (
-    <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.paper }}>
-      <Text style={{ color: colors.navy }}>TrailQuester</Text>
-      <StatusBar style="auto" />
-    </View>
+    <QuesterProvider>
+      <Flow />
+    </QuesterProvider>
   );
 }
