@@ -97,6 +97,13 @@ def get_validation(draft_id: str) -> ValidationResult:
     return draft_service.validate(draft)
 
 
+@router.delete("/{draft_id}", status_code=204)
+def delete_draft(draft_id: str) -> None:
+    """Delete a draft. Shared stop content and published snapshots are untouched."""
+    if not draft_service.delete(draft_id):
+        raise HTTPException(status_code=404, detail="Draft not found")
+
+
 @router.post("/{draft_id}/publish", response_model=DraftTrail)
 def publish_draft(draft_id: str) -> DraftTrail:
     draft = draft_service.get(draft_id)

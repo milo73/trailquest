@@ -366,6 +366,9 @@ class DraftStore(ABC):
     def list_drafts(self) -> list[DraftTrail]: ...
 
     @abstractmethod
+    def delete(self, draft_id: str) -> bool: ...
+
+    @abstractmethod
     def clear(self) -> None: ...
 
 
@@ -382,6 +385,9 @@ class InMemoryDraftStore(DraftStore):
 
     def list_drafts(self) -> list[DraftTrail]:
         return [_hydrate_draft(rec) for rec in self._records.values()]
+
+    def delete(self, draft_id: str) -> bool:
+        return self._records.pop(draft_id, None) is not None
 
     def clear(self) -> None:
         self._records.clear()
@@ -418,6 +424,13 @@ class FileDraftStore(DraftStore):
             rec = DraftRecord.model_validate_json(f.read_text(encoding="utf-8"))
             out.append(_hydrate_draft(rec))
         return out
+
+    def delete(self, draft_id: str) -> bool:
+        path = self._path(draft_id)
+        if not path.exists():
+            return False
+        path.unlink()
+        return True
 
     def clear(self) -> None:
         for f in self._dir.glob("*.json"):

@@ -114,6 +114,10 @@ def list_drafts() -> list[DraftTrail]:
     return drafts.list_drafts()
 
 
+def delete(draft_id: str) -> bool:
+    return drafts.delete(draft_id)
+
+
 def update(draft_id: str, req: DraftUpdate) -> DraftTrail | None:
     draft = drafts.get(draft_id)
     if draft is None:

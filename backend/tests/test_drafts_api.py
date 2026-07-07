@@ -52,3 +52,26 @@ def test_create_with_unknown_place_returns_422(monkeypatch):
     r = client.post("/drafts", json={"place": "Nergensland"})
     assert r.status_code == 422
     assert "niet gevonden" in r.json()["detail"]
+
+
+def test_delete_draft_removes_it():
+    d = client.post("/drafts", json={"start": {"lat": 52.3812, "lon": 4.6361}}).json()
+    assert client.delete(f"/drafts/{d['id']}").status_code == 204
+    assert client.get(f"/drafts/{d['id']}").status_code == 404
+
+
+def test_delete_unknown_draft_is_404():
+    assert client.delete("/drafts/nope").status_code == 404
+
+
+def test_delete_draft_keeps_published_trail_playable(monkeypatch):
+    from app.models.schemas import DraftCreate, GeoPoint
+    from app.services import draft_service
+
+    d = draft_service.create(
+        DraftCreate(start=GeoPoint(lat=52.3812, lon=4.6361), from_concept=True)
+    )
+    assert client.post(f"/drafts/{d.id}/publish").status_code == 200
+    assert client.delete(f"/drafts/{d.id}").status_code == 204
+    # the published snapshot is immutable — still playable after the draft is gone
+    assert client.get(f"/trails/{d.id}").status_code == 200
