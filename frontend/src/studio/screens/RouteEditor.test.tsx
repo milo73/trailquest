@@ -121,6 +121,37 @@ test("Genereer concept passes desired_stops when the aantal-stops input is set",
   expect(body.from_concept).toBe(true);
 });
 
+test("theme select shows draft's theme and changing it issues a PUT with the new theme", async () => {
+  const seeded = draft([]);
+  const fetchMock = vi
+    .fn()
+    .mockResolvedValueOnce(new Response(JSON.stringify(seeded), { status: 201 })) // createDraft
+    .mockResolvedValue(new Response(JSON.stringify({ ...seeded, theme: "nature" }), { status: 200 })); // updateDraft
+  vi.stubGlobal("fetch", fetchMock);
+  render(<MemoryRouter><DraftProvider><Harness seed={seeded} /></DraftProvider></MemoryRouter>);
+  await userEvent.click(screen.getByText("seed"));
+
+  const themeSelect = await screen.findByRole("combobox", { name: /thema/i });
+  expect(themeSelect).toHaveValue("historical");
+
+  await userEvent.selectOptions(themeSelect, "nature");
+
+  await waitFor(() => {
+    const put = fetchMock.mock.calls.find((c) => c[0] === "/api/drafts/d1" && c[1]?.method === "PUT");
+    expect(put).toBeTruthy();
+    expect(JSON.parse(put![1].body)).toMatchObject({ theme: "nature" });
+  });
+});
+
+test("theme hint text renders", async () => {
+  const seeded = draft([]);
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(seeded), { status: 201 })));
+  render(<MemoryRouter><DraftProvider><Harness seed={seeded} /></DraftProvider></MemoryRouter>);
+  await userEvent.click(screen.getByText("seed"));
+
+  expect(await screen.findByText(/Bestaande verhalen veranderen pas na opnieuw genereren/i)).toBeInTheDocument();
+});
+
 test("the Publiceren button navigates to /studio/validate", async () => {
   const seeded = draft([]);
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(seeded), { status: 201 })));

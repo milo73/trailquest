@@ -1,6 +1,6 @@
 import { createContext, useContext, useMemo, useState } from "react";
 import { createDraft as apiCreate, createCustomStop, deleteDraft as apiDeleteDraft, getDraft, updateDraft, updateStopContent, generateStopContent as apiGenerateStopContent } from "../api/drafts";
-import type { CustomStopRequest, DraftCreate, DraftStop, DraftTrail, POI, StopContentUpdate, StopGenerateRequest, StopGenerateResult } from "../api/types";
+import type { CustomStopRequest, DraftCreate, DraftStop, DraftTrail, POI, StopContentUpdate, StopGenerateRequest, StopGenerateResult, Theme } from "../api/types";
 
 const STORAGE_KEY = "tq.studio.draft";
 const ACTIVE_KEY = "tq.studio.activeStop";
@@ -18,6 +18,7 @@ interface DraftApi {
   saveStopContent: (order: number, content: StopContentUpdate) => Promise<void>;
   generateStopContent: (order: number, body: StopGenerateRequest) => Promise<StopGenerateResult>;
   renameDraft: (title: string) => Promise<void>;
+  setTheme: (theme: Theme) => Promise<void>;
   addCustomStop: (body: CustomStopRequest) => Promise<void>;
   removeDraft: (id: string) => Promise<void>;
 }
@@ -106,6 +107,16 @@ export function DraftProvider({ children }: { children: React.ReactNode }) {
         setSaving(true);
         try {
           const saved = await updateDraft(draft.id, { title });
+          setDraft(saved);
+        } finally {
+          setSaving(false);
+        }
+      },
+      setTheme: async (theme) => {
+        if (!draft) return;
+        setSaving(true);
+        try {
+          const saved = await updateDraft(draft.id, { theme });
           setDraft(saved);
         } finally {
           setSaving(false);
