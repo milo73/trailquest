@@ -4,12 +4,22 @@ import { expect, test, vi, beforeEach, afterEach } from "vitest";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import { Dashboard } from "./Dashboard";
 import { DraftProvider } from "../draftStore";
+import type { DraftTrail } from "../../api/types";
 
-const DRAFT_D1 = {
+function makeDraft(overrides: Partial<DraftTrail> = {}): DraftTrail {
+  return { ...DRAFT_BASE, ...overrides };
+}
+
+const DRAFT_BASE: DraftTrail = {
   id: "d1", title: "Mijn nieuwe tocht", city: "Haarlem", theme: "nature",
   start: { lat: 52.38, lon: 4.63 }, requested_distance_km: 5, actual_distance_km: 3.4,
   estimated_duration_min: 60, stops: [], status: "concept", attributions: [],
 };
+
+const DRAFT_D1 = makeDraft();
+
+const DRAFT_PUBLISHED = makeDraft({ id: "d2", title: "Gepubliceerde tocht", status: "published" });
+const DRAFT_REVIEW = makeDraft({ id: "d3", title: "Review tocht", status: "review" });
 
 beforeEach(() => {
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("[]", { status: 200 })));
@@ -20,18 +30,66 @@ afterEach(() => {
   localStorage.clear();
 });
 
-test("renders the trail cards and stats", async () => {
+test("stat tiles are computed from real drafts", async () => {
+  const three = [DRAFT_D1, DRAFT_PUBLISHED, DRAFT_REVIEW];
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(three), { status: 200 })));
+
   render(<MemoryRouter><DraftProvider><Dashboard /></DraftProvider></MemoryRouter>);
-  expect(await screen.findByText("Haarlems Gouden Eeuw")).toBeInTheDocument();
-  expect(screen.getByText("Verborgen hofjes")).toBeInTheDocument();
-  expect(screen.getByText("1.240")).toBeInTheDocument(); // keer gespeeld
+
+  // Wait for data to load
+  await screen.findByText("Mijn nieuwe tocht");
+
+  // Total count tile
+  const tiles = screen.getAllByText("3");
+  expect(tiles.length).toBeGreaterThanOrEqual(1);
+
+  // Live tile (1 published)
+  expect(screen.getByText("LIVE")).toBeInTheDocument();
+
+  // Concepten tile (1 concept)
+  expect(screen.getByText("CONCEPTEN")).toBeInTheDocument();
+
+  // Stops tile (all have 0 stops)
+  expect(screen.getByText("STOPS")).toBeInTheDocument();
+
+  // Header shows count
+  expect(screen.getByText("3 tochten · TrailQuest Studio voor Haarlem")).toBeInTheDocument();
 });
 
-test("lists real drafts from the API alongside the mock cards", async () => {
-  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify([DRAFT_D1]), { status: 200 })));
+test("filter chip 'Concept' shows only concept cards", async () => {
+  const three = [DRAFT_D1, DRAFT_PUBLISHED, DRAFT_REVIEW];
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(three), { status: 200 })));
+
   render(<MemoryRouter><DraftProvider><Dashboard /></DraftProvider></MemoryRouter>);
-  expect(await screen.findByText("Mijn nieuwe tocht")).toBeInTheDocument(); // real draft
-  expect(screen.getByText("Verborgen hofjes")).toBeInTheDocument(); // mock card still there
+
+  await screen.findByText("Mijn nieuwe tocht");
+
+  // Click Concept chip
+  await userEvent.click(screen.getByRole("button", { name: "Concept" }));
+
+  // Only the concept card visible
+  expect(screen.getByText("Mijn nieuwe tocht")).toBeInTheDocument();
+  expect(screen.queryByText("Gepubliceerde tocht")).not.toBeInTheDocument();
+  expect(screen.queryByText("Review tocht")).not.toBeInTheDocument();
+});
+
+test("filter chip 'Alle' restores all cards after filtering", async () => {
+  const three = [DRAFT_D1, DRAFT_PUBLISHED, DRAFT_REVIEW];
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(three), { status: 200 })));
+
+  render(<MemoryRouter><DraftProvider><Dashboard /></DraftProvider></MemoryRouter>);
+
+  await screen.findByText("Mijn nieuwe tocht");
+
+  // Filter to concept
+  await userEvent.click(screen.getByRole("button", { name: "Concept" }));
+  expect(screen.queryByText("Gepubliceerde tocht")).not.toBeInTheDocument();
+
+  // Restore all
+  await userEvent.click(screen.getByRole("button", { name: "Alle" }));
+  expect(screen.getByText("Mijn nieuwe tocht")).toBeInTheDocument();
+  expect(screen.getByText("Gepubliceerde tocht")).toBeInTheDocument();
+  expect(screen.getByText("Review tocht")).toBeInTheDocument();
 });
 
 test("clicking a real draft card calls GET /api/drafts/:id (loadDraft)", async () => {

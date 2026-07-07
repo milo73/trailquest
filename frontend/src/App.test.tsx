@@ -1,6 +1,15 @@
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { vi, beforeEach, afterEach } from "vitest";
 import App from "./App";
+
+beforeEach(() => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("[]", { status: 200 })));
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 test("renders the studio route", async () => {
   render(
@@ -8,5 +17,6 @@ test("renders the studio route", async () => {
       <App />
     </MemoryRouter>,
   );
-  expect(await screen.findByText("Haarlems Gouden Eeuw")).toBeInTheDocument();
+  const matches = await screen.findAllByText("Mijn tochten");
+  expect(matches.length).toBeGreaterThanOrEqual(1);
 });

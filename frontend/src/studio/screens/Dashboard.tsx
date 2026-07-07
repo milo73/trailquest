@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { StudioChrome } from "../StudioChrome";
-import { MOCK_TRAILS, MOCK_DASHBOARD_STATS, type StudioTrailCard } from "../mock/trails";
 import { listDrafts } from "../../api/drafts";
 import { useDraft } from "../draftStore";
 import type { DraftCreate, DraftTrail } from "../../api/types";
@@ -89,7 +88,7 @@ function formatKm(km: number): string {
   return km.toFixed(1).replace(".", ",");
 }
 
-function statusBadge(status: StudioTrailCard["status"] | string) {
+function statusBadge(status: string) {
   if (status === "concept") {
     return (
       <span
@@ -144,79 +143,6 @@ function statusBadge(status: StudioTrailCard["status"] | string) {
     >
       In review
     </span>
-  );
-}
-
-function TrailCard({ trail, onClick }: { trail: StudioTrailCard; onClick: () => void }) {
-  return (
-    <div
-      onClick={onClick}
-      style={{
-        background: "#faf6ec",
-        border: "1px solid #e6dcc6",
-        borderRadius: 14,
-        overflow: "hidden",
-        cursor: "pointer",
-      }}
-    >
-      {/* Map thumbnail */}
-      <div style={{ position: "relative", height: 104 }}>
-        <svg viewBox="0 0 380 104" style={{ width: "100%", height: "100%" }}>
-          <rect width="380" height="104" fill="#e8dec9" />
-          <g stroke="#dccfb4" strokeWidth="9">
-            <line x1="-10" y1="50" x2="400" y2="42" />
-            <line x1="160" y1="-10" x2="170" y2="120" />
-          </g>
-          <path d="M50 80 110 30 200 60 300 35" fill="none" stroke="#b5453a" strokeWidth="3" strokeDasharray="2 8" />
-          <circle cx="110" cy="30" r="8" fill="#b5453a" />
-          <circle cx="200" cy="60" r="8" fill="#b5453a" />
-        </svg>
-        {statusBadge(trail.status)}
-      </div>
-
-      {/* Card body */}
-      <div style={{ padding: "15px 16px" }}>
-        <div style={{ font: "400 18px/1.1 var(--tq-serif)", color: "#283a5e" }}>{trail.title}</div>
-        <div style={{ font: "500 11px/1 var(--tq-sans)", color: "#8a7f6d", marginTop: 7 }}>
-          {trail.theme} · {trail.distanceKm.toFixed(1).replace(".", ",")} km · {trail.stops} stops
-        </div>
-        <div
-          style={{
-            display: "flex",
-            gap: 14,
-            marginTop: 14,
-            paddingTop: 13,
-            borderTop: "1px solid #ece2cf",
-            font: "500 11px/1 var(--tq-mono)",
-            color: "#8a7f6d",
-          }}
-        >
-          {trail.status === "concept" && (
-            <>
-              <span>nog niet live</span>
-              {trail.warnings != null && (
-                <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 4, color: "#a3781f" }}>
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#c5912f" strokeWidth="2.2">
-                    <path d="M12 3 22 20H2Z" />
-                  </svg>
-                  {trail.warnings}
-                </span>
-              )}
-            </>
-          )}
-          {trail.status === "live" && (
-            <>
-              <span>{trail.plays}× gespeeld</span>
-              {trail.completion != null && <span>{trail.completion}% af</span>}
-              {trail.rating != null && (
-                <span style={{ marginLeft: "auto", color: "#c5912f" }}>{trail.rating.toFixed(1).replace(".", ",")} ★</span>
-              )}
-            </>
-          )}
-          {trail.status === "review" && <span>wacht op moderatie</span>}
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -305,18 +231,21 @@ function DraftCard({ draft, onClick, onDelete }: { draft: DraftTrail; onClick: (
   );
 }
 
+type FilterValue = "alle" | "published" | "concept" | "review";
+
 export function Dashboard() {
   const navigate = useNavigate();
   const { createDraft, loadDraft, removeDraft } = useDraft();
-  const [realDrafts, setRealDrafts] = useState<DraftTrail[]>([]);
+  const [drafts, setDrafts] = useState<DraftTrail[]>([]);
+  const [filter, setFilter] = useState<FilterValue>("alle");
   const [creating, setCreating] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
   function refreshDrafts() {
     listDrafts()
-      .then((drafts) => setRealDrafts(drafts))
-      .catch(() => setRealDrafts([]));
+      .then((d) => setDrafts(d))
+      .catch(() => setDrafts([]));
   }
 
   useEffect(() => {
@@ -345,7 +274,19 @@ export function Dashboard() {
     }
   }
 
-  const playsFormatted = MOCK_DASHBOARD_STATS.plays.toLocaleString("nl-NL");
+  // Computed stats from real drafts
+  const totalCount = drafts.length;
+  const liveCount = drafts.filter((d) => d.status === "published").length;
+  const conceptCount = drafts.filter((d) => d.status === "concept").length;
+  const stopsTotal = drafts.reduce((sum, d) => sum + d.stops.length, 0);
+
+  // Filtered view
+  const visibleDrafts = filter === "alle" ? drafts : drafts.filter((d) => d.status === filter);
+
+  const chipStyle = (value: FilterValue) =>
+    filter === value
+      ? { font: "600 12px/1 var(--tq-sans)", color: "#fff", background: "#283a5e", borderRadius: 20, padding: "9px 14px", border: "none", cursor: "pointer" as const }
+      : { font: "600 12px/1 var(--tq-sans)", color: "#6b6256", background: "#faf6ec", border: "1px solid #e0d5bf", borderRadius: 20, padding: "9px 14px", cursor: "pointer" as const };
 
   return (
     <StudioChrome breadcrumb="mijn-tochten">
@@ -355,66 +296,45 @@ export function Dashboard() {
           <div>
             <div style={{ font: "400 30px/1 var(--tq-serif)", color: "#283a5e" }}>Mijn tochten</div>
             <div style={{ font: "500 13px/1 var(--tq-sans)", color: "#8a7f6d", marginTop: 8 }}>
-              {MOCK_DASHBOARD_STATS.trails} tochten · TrailQuest Studio voor Haarlem
+              {totalCount} tochten · TrailQuest Studio voor Haarlem
             </div>
           </div>
           <div style={{ display: "flex", gap: 7 }}>
-            <span style={{ font: "600 12px/1 var(--tq-sans)", color: "#fff", background: "#283a5e", borderRadius: 20, padding: "9px 14px" }}>
-              Alle
-            </span>
-            <span style={{ font: "600 12px/1 var(--tq-sans)", color: "#6b6256", background: "#faf6ec", border: "1px solid #e0d5bf", borderRadius: 20, padding: "9px 14px" }}>
-              Gepubliceerd
-            </span>
-            <span style={{ font: "600 12px/1 var(--tq-sans)", color: "#6b6256", background: "#faf6ec", border: "1px solid #e0d5bf", borderRadius: 20, padding: "9px 14px" }}>
-              Concept
-            </span>
-            <span style={{ font: "600 12px/1 var(--tq-sans)", color: "#6b6256", background: "#faf6ec", border: "1px solid #e0d5bf", borderRadius: 20, padding: "9px 14px" }}>
-              In review
-            </span>
+            <button onClick={() => setFilter("alle")} style={chipStyle("alle")}>Alle</button>
+            <button onClick={() => setFilter("published")} style={chipStyle("published")}>Gepubliceerd</button>
+            <button onClick={() => setFilter("concept")} style={chipStyle("concept")}>Concept</button>
+            <button onClick={() => setFilter("review")} style={chipStyle("review")}>In review</button>
           </div>
         </div>
 
         {/* Stat tiles */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 14, margin: "20px 0 22px" }}>
           <div style={{ background: "#faf6ec", border: "1px solid #e6dcc6", borderRadius: 12, padding: "15px 16px" }}>
-            <div style={{ font: "400 26px/1 var(--tq-serif)", color: "#283a5e" }}>{MOCK_DASHBOARD_STATS.trails}</div>
+            <div style={{ font: "400 26px/1 var(--tq-serif)", color: "#283a5e" }}>{totalCount}</div>
             <div style={{ font: "500 11px/1 var(--tq-mono)", color: "#8a7f6d", marginTop: 6 }}>TOCHTEN</div>
           </div>
           <div style={{ background: "#faf6ec", border: "1px solid #e6dcc6", borderRadius: 12, padding: "15px 16px" }}>
-            <div style={{ font: "400 26px/1 var(--tq-serif)", color: "#283a5e" }}>{playsFormatted}</div>
-            <div style={{ font: "500 11px/1 var(--tq-mono)", color: "#8a7f6d", marginTop: 6 }}>KEER GESPEELD</div>
+            <div style={{ font: "400 26px/1 var(--tq-serif)", color: "#283a5e" }}>{liveCount}</div>
+            <div style={{ font: "500 11px/1 var(--tq-mono)", color: "#8a7f6d", marginTop: 6 }}>LIVE</div>
           </div>
           <div style={{ background: "#faf6ec", border: "1px solid #e6dcc6", borderRadius: 12, padding: "15px 16px" }}>
-            <div style={{ font: "400 26px/1 var(--tq-serif)", color: "#283a5e" }}>
-              {MOCK_DASHBOARD_STATS.rating.toFixed(1).replace(".", ",")}{" "}
-              <span style={{ font: "600 14px var(--tq-sans)", color: "#c5912f" }}>★</span>
-            </div>
-            <div style={{ font: "500 11px/1 var(--tq-mono)", color: "#8a7f6d", marginTop: 6 }}>GEM. BEOORDELING</div>
+            <div style={{ font: "400 26px/1 var(--tq-serif)", color: "#283a5e" }}>{conceptCount}</div>
+            <div style={{ font: "500 11px/1 var(--tq-mono)", color: "#8a7f6d", marginTop: 6 }}>CONCEPTEN</div>
           </div>
-          <div style={{ background: "#e7eed7", border: "1px solid #cdd9b3", borderRadius: 12, padding: "15px 16px" }}>
-            <div style={{ font: "400 26px/1 var(--tq-serif)", color: "#3a5a2f" }}>{MOCK_DASHBOARD_STATS.correctness}%</div>
-            <div style={{ font: "500 11px/1 var(--tq-mono)", color: "#5a6a3f", marginTop: 6 }}>CONTENT-CORRECT</div>
+          <div style={{ background: "#faf6ec", border: "1px solid #e6dcc6", borderRadius: 12, padding: "15px 16px" }}>
+            <div style={{ font: "400 26px/1 var(--tq-serif)", color: "#283a5e" }}>{stopsTotal}</div>
+            <div style={{ font: "500 11px/1 var(--tq-mono)", color: "#8a7f6d", marginTop: 6 }}>STOPS</div>
           </div>
         </div>
 
         {/* Trail card grid */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 18 }}>
-          {/* Real drafts from API — rendered first */}
-          {realDrafts.map((draft) => (
+          {visibleDrafts.map((draft) => (
             <DraftCard
               key={draft.id}
               draft={draft}
               onClick={() => openDraft(draft.id)}
               onDelete={() => setDeleteTargetId(draft.id)}
-            />
-          ))}
-
-          {/* Mock cards */}
-          {MOCK_TRAILS.map((trail) => (
-            <TrailCard
-              key={trail.id}
-              trail={trail}
-              onClick={() => navigate("/studio/route")}
             />
           ))}
 
