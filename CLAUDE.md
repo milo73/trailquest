@@ -6,8 +6,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 The product spec lives in `PRD.md` (Dutch); `README.md` and `LICENSE` (MIT) sit
 alongside it. The first service — the **Python/FastAPI backend** — is scaffolded
-under `backend/` as a walking skeleton (see `backend/README.md`). The mobile
-client (React Native) is not built yet.
+under `backend/` as a walking skeleton (see `backend/README.md`). There is a
+Vite/React web app under `frontend/` (player + studio), and the **React Native
+(Expo) player app** has an MVP under `mobile/` (iOS-first; see `mobile/README.md`).
 
 `backend/` is a **modular monolith**: each module under `app/services/` maps to a
 target service from PRD §9.1 (route, POI/data, content/RAG, gamification) so it
