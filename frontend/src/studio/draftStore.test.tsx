@@ -130,6 +130,60 @@ test("addCustomStop POSTs to /stops and replaces the draft", async () => {
   expect(fetchMock.mock.calls[1][0]).toBe("/api/drafts/d1/stops");
 });
 
+test("addCustomStop with insertAfter=1 moves the appended stop into position via one PUT", async () => {
+  const twoStops = draft([
+    { order: 1, poi: poi("p1", "Stop A") },
+    { order: 2, poi: poi("p2", "Stop B") },
+  ]);
+  // Backend appends the custom stop at the end (order 3).
+  const appended = draft([
+    { order: 1, poi: poi("p1", "Stop A") },
+    { order: 2, poi: poi("p2", "Stop B") },
+    { order: 3, poi: poi("custom:c1", "Mijn plek") },
+  ]);
+  const reordered = draft([
+    { order: 1, poi: poi("p1", "Stop A") },
+    { order: 2, poi: poi("custom:c1", "Mijn plek") },
+    { order: 3, poi: poi("p2", "Stop B") },
+  ]);
+  const fetchMock = vi
+    .fn()
+    .mockResolvedValueOnce(mockJson(twoStops, 201)) // createDraft
+    .mockResolvedValueOnce(mockJson(appended, 201)) // createCustomStop (POST)
+    .mockResolvedValueOnce(mockJson(reordered)); // reorder PUT
+  vi.stubGlobal("fetch", fetchMock);
+  const { result } = renderHook(() => useDraft(), { wrapper });
+  await act(async () => { await result.current.createDraft({ start: { lat: 52.38, lon: 4.63 } }); });
+  await act(async () => { await result.current.addCustomStop({ name: "Mijn plek" }, 1); });
+
+  // exactly one POST + one reorder PUT
+  expect(fetchMock.mock.calls[1][0]).toBe("/api/drafts/d1/stops");
+  const putCall = fetchMock.mock.calls[2];
+  expect(putCall[0]).toBe("/api/drafts/d1");
+  expect(JSON.parse(putCall[1].body).stop_poi_ids).toEqual(["p1", "custom:c1", "p2"]);
+  expect(fetchMock.mock.calls).toHaveLength(3);
+});
+
+test("addCustomStop with insertAfter pointing at the end skips the reorder PUT", async () => {
+  const oneStop = draft([{ order: 1, poi: poi("p1", "Stop A") }]);
+  const appended = draft([
+    { order: 1, poi: poi("p1", "Stop A") },
+    { order: 2, poi: poi("custom:c1", "Mijn plek") },
+  ]);
+  const fetchMock = vi
+    .fn()
+    .mockResolvedValueOnce(mockJson(oneStop, 201)) // createDraft
+    .mockResolvedValueOnce(mockJson(appended, 201)); // createCustomStop (POST)
+  vi.stubGlobal("fetch", fetchMock);
+  const { result } = renderHook(() => useDraft(), { wrapper });
+  await act(async () => { await result.current.createDraft({ start: { lat: 52.38, lon: 4.63 } }); });
+  await act(async () => { await result.current.addCustomStop({ name: "Mijn plek" }, 1); });
+
+  // already in position after the POST -> no extra PUT
+  expect(fetchMock.mock.calls).toHaveLength(2);
+  expect(result.current.draft?.stops).toHaveLength(2);
+});
+
 // --- Task 7: stop insertion position ---
 
 test("addStop with insertAfter=1 inserts the new stop between existing stops", async () => {

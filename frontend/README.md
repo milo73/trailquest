@@ -111,7 +111,6 @@ src/
 │       └── Finish.tsx       points tally + badges earned
 │
 └── studio/                  creator studio
-    ├── mock/                seed data (trails.ts, stop.ts, validation.ts)
     ├── StudioChrome.tsx     shell nav (Dashboard / Route / Stop / Validation)
     ├── StudioApp.tsx        router root
     └── screens/
