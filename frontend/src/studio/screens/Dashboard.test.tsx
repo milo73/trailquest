@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, test, vi, beforeEach, afterEach } from "vitest";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
@@ -112,13 +112,9 @@ test("delete draft: confirm Verwijderen issues DELETE and removes the card", asy
     return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
   });
 
-  // Confirm deletion (click the modal's confirm button)
-  const confirmBtns = screen.getAllByRole("button", { name: "Verwijderen" });
-  // The confirm button in the dialog is the last one (or we pick from the dialog)
+  // Confirm deletion (click the modal's confirm button, scoped to the dialog)
   const dialog = screen.getByRole("dialog", { name: "Tocht verwijderen" });
-  const confirmBtn = dialog.querySelector("button[style*='#b5453a']") as HTMLElement
-    ?? confirmBtns[confirmBtns.length - 1];
-  await userEvent.click(confirmBtn);
+  await userEvent.click(within(dialog).getByRole("button", { name: "Verwijderen" }));
 
   // DELETE /api/drafts/d1 must have been called
   const deleteCalls = fetchMock.mock.calls.filter((c: unknown[]) => (c[1] as RequestInit | undefined)?.method === "DELETE");

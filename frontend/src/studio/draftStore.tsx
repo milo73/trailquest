@@ -127,6 +127,11 @@ export function DraftProvider({ children }: { children: React.ReactNode }) {
           setDraft(undefined);
           localStorage.removeItem(ACTIVE_KEY);
         }
+        // Always drop the persisted draft id when it points at the deleted
+        // draft — otherwise a reload tries to load a 404.
+        if (localStorage.getItem(STORAGE_KEY) === id) {
+          localStorage.removeItem(STORAGE_KEY);
+        }
       },
     };
   }, [draft, activeStopOrder, saving]);
