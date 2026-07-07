@@ -1,4 +1,8 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useDraft } from "./draftStore";
+import { NewTrailForm } from "./components/NewTrailForm";
+import type { DraftCreate } from "../api/types";
 
 type StudioChromeProps = {
   breadcrumb?: string;
@@ -8,6 +12,22 @@ type StudioChromeProps = {
 
 export function StudioChrome({ breadcrumb = "mijn-tochten", actions, children }: StudioChromeProps) {
   const navigate = useNavigate();
+  const { createDraft } = useDraft();
+  const [showNew, setShowNew] = useState(false);
+  const [creating, setCreating] = useState(false);
+
+  async function handleGenerate(req: DraftCreate) {
+    setCreating(true);
+    try {
+      await createDraft(req);
+      setShowNew(false);
+      navigate("/studio/route");
+    } catch (e) {
+      throw e;
+    } finally {
+      setCreating(false);
+    }
+  }
 
   return (
     <div
@@ -110,7 +130,7 @@ export function StudioChrome({ breadcrumb = "mijn-tochten", actions, children }:
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 14 }}>
           {actions}
           <button
-            onClick={() => navigate("/studio/route")}
+            onClick={() => setShowNew(true)}
             style={{
               height: 40,
               padding: "0 18px",
@@ -150,6 +170,14 @@ export function StudioChrome({ breadcrumb = "mijn-tochten", actions, children }:
 
       {/* Page content */}
       {children}
+
+      {showNew && (
+        <NewTrailForm
+          submitting={creating}
+          onClose={() => setShowNew(false)}
+          onSubmit={handleGenerate}
+        />
+      )}
     </div>
   );
 }
