@@ -152,6 +152,15 @@ test("theme hint text renders", async () => {
   expect(await screen.findByText(/Bestaande verhalen veranderen pas na opnieuw genereren/i)).toBeInTheDocument();
 });
 
+test("clicking Voorvertoning shows the preview dialog", async () => {
+  const seeded = draft([]);
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(seeded), { status: 201 })));
+  render(<MemoryRouter><DraftProvider><Harness seed={seeded} /></DraftProvider></MemoryRouter>);
+  await userEvent.click(screen.getByText("seed"));
+  await userEvent.click(await screen.findByRole("button", { name: /^Voorvertoning$/i }));
+  expect(screen.getByRole("dialog", { name: "Voorvertoning" })).toBeInTheDocument();
+});
+
 test("the Publiceren button navigates to /studio/validate", async () => {
   const seeded = draft([]);
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(seeded), { status: 201 })));

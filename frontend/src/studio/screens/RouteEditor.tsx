@@ -7,6 +7,7 @@ import { Chip } from "../../design-system/primitives/Chip";
 import { useDraft } from "../draftStore";
 import { PoiPicker } from "../components/PoiPicker";
 import { CustomStopForm } from "../components/CustomStopForm";
+import { TrailPreviewModal } from "../components/TrailPreviewModal";
 import { THEME_LABELS } from "../themeLabels";
 import type { Theme } from "../../api/types";
 
@@ -25,6 +26,7 @@ function formatDuration(min: number): string {
 export function RouteEditor() {
   const navigate = useNavigate();
   const { draft, addStop, removeStop, reorder, setActiveStop, createDraft, loadDraft, addCustomStop, renameDraft, setTheme, saving } = useDraft();
+  const [showPreview, setShowPreview] = useState(false);
   const [addMode, setAddMode] = useState<null | "menu" | "catalog" | "custom">(null);
   const [busy, setBusy] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -138,6 +140,7 @@ export function RouteEditor() {
       actions={
         <div style={{ display: "flex", gap: 9, alignItems: "center" }}>
           <button
+            onClick={() => setShowPreview(true)}
             style={{
               height: 40,
               padding: "0 16px",
@@ -794,6 +797,11 @@ export function RouteEditor() {
           onSubmit={(body) => { handleAddCustomStop(body); }}
           onClose={() => setAddMode(null)}
         />
+      )}
+
+      {/* TrailPreviewModal */}
+      {showPreview && draft && (
+        <TrailPreviewModal draft={draft} onClose={() => setShowPreview(false)} />
       )}
     </StudioChrome>
   );
