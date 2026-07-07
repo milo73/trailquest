@@ -7,17 +7,24 @@ interface CustomStopBody {
   source_ref?: string;
 }
 
-interface Props {
-  start: { lat: number; lon: number };
-  onSubmit: (body: CustomStopBody) => void;
-  onClose: () => void;
+interface StopSummary {
+  order: number;
+  name: string;
 }
 
-export function CustomStopForm({ start, onSubmit, onClose }: Props) {
+interface Props {
+  start: { lat: number; lon: number };
+  onSubmit: (body: CustomStopBody, insertAfter?: number) => void;
+  onClose: () => void;
+  stops?: StopSummary[];
+}
+
+export function CustomStopForm({ start, onSubmit, onClose, stops }: Props) {
   const [name, setName] = useState("");
   const [lat, setLat] = useState("");
   const [lon, setLon] = useState("");
   const [sourceRef, setSourceRef] = useState("");
+  const [insertAfter, setInsertAfter] = useState<string>("");
 
   const canSubmit = name.trim() !== "" || sourceRef.trim() !== "";
 
@@ -31,7 +38,7 @@ export function CustomStopForm({ start, onSubmit, onClose }: Props) {
     if (sourceRef.trim()) body.source_ref = sourceRef.trim();
     if (!isNaN(parsedLat)) body.lat = parsedLat;
     if (!isNaN(parsedLon)) body.lon = parsedLon;
-    onSubmit(body);
+    onSubmit(body, insertAfter === "" ? undefined : Number(insertAfter));
   }
 
   return (
@@ -196,6 +203,41 @@ export function CustomStopForm({ start, onSubmit, onClose }: Props) {
               />
             </div>
           </div>
+
+          {stops !== undefined && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+              <label
+                htmlFor="custom-stop-insert-after"
+                style={{ font: "600 12px/1 var(--tq-sans)", color: "var(--tq-navy)" }}
+              >
+                Invoegen na
+              </label>
+              <select
+                id="custom-stop-insert-after"
+                aria-label="Invoegen na"
+                value={insertAfter}
+                onChange={(e) => setInsertAfter(e.target.value)}
+                style={{
+                  height: 38,
+                  padding: "0 10px",
+                  border: "1px solid var(--tq-border)",
+                  borderRadius: 8,
+                  font: "400 14px/1 var(--tq-sans)",
+                  color: "var(--tq-ink)",
+                  background: "var(--tq-sand)",
+                  outline: "none",
+                }}
+              >
+                <option value="">Einde</option>
+                <option value="0">Begin (na start)</option>
+                {stops.map((s) => (
+                  <option key={s.order} value={String(s.order)}>
+                    Na stop {s.order} — {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <button
             type="submit"

@@ -129,3 +129,60 @@ test("addCustomStop POSTs to /stops and replaces the draft", async () => {
   expect(result.current.draft?.stops[0].poi.name).toBe("Mijn plek");
   expect(fetchMock.mock.calls[1][0]).toBe("/api/drafts/d1/stops");
 });
+
+// --- Task 7: stop insertion position ---
+
+test("addStop with insertAfter=1 inserts the new stop between existing stops", async () => {
+  const initialDraft = draft([
+    { order: 1, poi: poi("p1", "Stop A") },
+    { order: 2, poi: poi("p2", "Stop B") },
+  ]);
+  const newPoi = poi("p3", "Nieuw");
+  // The PUT response after insertion: server returns the authoritative order
+  const afterInsert = draft([
+    { order: 1, poi: poi("p1", "Stop A") },
+    { order: 2, poi: newPoi },
+    { order: 3, poi: poi("p2", "Stop B") },
+  ]);
+  const fetchMock = vi
+    .fn()
+    .mockResolvedValueOnce(mockJson(initialDraft, 201)) // createDraft
+    .mockResolvedValueOnce(mockJson(afterInsert)); // updateDraft (PUT)
+  vi.stubGlobal("fetch", fetchMock);
+
+  const { result } = renderHook(() => useDraft(), { wrapper });
+  await act(async () => { await result.current.createDraft({ start: { lat: 52.38, lon: 4.63 } }); });
+  await act(async () => { await result.current.addStop(newPoi, 1); });
+
+  await waitFor(() => expect(result.current.draft?.stops).toHaveLength(3));
+  // The PUT must send p1, p3, p2 — new POI is placed second
+  const putCall = fetchMock.mock.calls[1];
+  expect(putCall[0]).toBe("/api/drafts/d1");
+  expect(JSON.parse(putCall[1].body).stop_poi_ids).toEqual(["p1", "p3", "p2"]);
+});
+
+test("addStop without insertAfter appends (existing behavior preserved)", async () => {
+  const initialDraft = draft([
+    { order: 1, poi: poi("p1", "Stop A") },
+    { order: 2, poi: poi("p2", "Stop B") },
+  ]);
+  const newPoi = poi("p3", "Nieuw");
+  const afterAppend = draft([
+    { order: 1, poi: poi("p1", "Stop A") },
+    { order: 2, poi: poi("p2", "Stop B") },
+    { order: 3, poi: newPoi },
+  ]);
+  const fetchMock = vi
+    .fn()
+    .mockResolvedValueOnce(mockJson(initialDraft, 201)) // createDraft
+    .mockResolvedValueOnce(mockJson(afterAppend)); // updateDraft (PUT)
+  vi.stubGlobal("fetch", fetchMock);
+
+  const { result } = renderHook(() => useDraft(), { wrapper });
+  await act(async () => { await result.current.createDraft({ start: { lat: 52.38, lon: 4.63 } }); });
+  await act(async () => { await result.current.addStop(newPoi); });
+
+  await waitFor(() => expect(result.current.draft?.stops).toHaveLength(3));
+  const putCall = fetchMock.mock.calls[1];
+  expect(JSON.parse(putCall[1].body).stop_poi_ids).toEqual(["p1", "p2", "p3"]);
+});

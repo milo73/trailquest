@@ -2,18 +2,25 @@ import { useEffect, useState } from "react";
 import { getPois } from "../../api/pois";
 import type { GeoPoint, POI } from "../../api/types";
 
+interface StopSummary {
+  order: number;
+  name: string;
+}
+
 interface Props {
   start: GeoPoint;
   excludeIds: string[];
-  onPick: (poi: POI) => void;
+  onPick: (poi: POI, insertAfter?: number) => void;
   onClose: () => void;
+  stops?: StopSummary[];
 }
 
-export function PoiPicker({ start, excludeIds, onPick, onClose }: Props) {
+export function PoiPicker({ start, excludeIds, onPick, onClose, stops }: Props) {
   const [candidates, setCandidates] = useState<POI[]>([]);
   const [empty, setEmpty] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [insertAfter, setInsertAfter] = useState<string>("");
 
   useEffect(() => {
     setLoading(true);
@@ -67,27 +74,61 @@ export function PoiPicker({ start, excludeIds, onPick, onClose }: Props) {
           style={{
             padding: "18px 20px 14px",
             borderBottom: "1px solid var(--tq-border)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
           }}
         >
-          <span style={{ font: "600 15px/1 var(--tq-sans)", color: "var(--tq-navy)" }}>
-            Stop toevoegen
-          </span>
-          <button
-            onClick={onClose}
-            style={{
-              border: "none",
-              background: "transparent",
-              cursor: "pointer",
-              font: "600 13px/1 var(--tq-sans)",
-              color: "var(--tq-muted)",
-              padding: "4px 8px",
-            }}
-          >
-            Sluiten
-          </button>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <span style={{ font: "600 15px/1 var(--tq-sans)", color: "var(--tq-navy)" }}>
+              Stop toevoegen
+            </span>
+            <button
+              onClick={onClose}
+              style={{
+                border: "none",
+                background: "transparent",
+                cursor: "pointer",
+                font: "600 13px/1 var(--tq-sans)",
+                color: "var(--tq-muted)",
+                padding: "4px 8px",
+              }}
+            >
+              Sluiten
+            </button>
+          </div>
+          {stops !== undefined && (
+            <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 8 }}>
+              <label
+                htmlFor="poi-picker-insert-after"
+                style={{ font: "600 12px/1 var(--tq-sans)", color: "var(--tq-navy)", flexShrink: 0 }}
+              >
+                Invoegen na
+              </label>
+              <select
+                id="poi-picker-insert-after"
+                aria-label="Invoegen na"
+                value={insertAfter}
+                onChange={(e) => setInsertAfter(e.target.value)}
+                style={{
+                  flex: 1,
+                  height: 32,
+                  padding: "0 8px",
+                  border: "1px solid var(--tq-border)",
+                  borderRadius: 7,
+                  font: "400 13px/1 var(--tq-sans)",
+                  color: "var(--tq-ink)",
+                  background: "var(--tq-sand)",
+                  outline: "none",
+                }}
+              >
+                <option value="">Einde</option>
+                <option value="0">Begin (na start)</option>
+                {stops.map((s) => (
+                  <option key={s.order} value={String(s.order)}>
+                    Na stop {s.order} — {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
 
         {/* POI list */}
@@ -130,7 +171,7 @@ export function PoiPicker({ start, excludeIds, onPick, onClose }: Props) {
               {candidates.map((poi) => (
                 <li
                   key={poi.id}
-                  onClick={() => onPick(poi)}
+                  onClick={() => onPick(poi, insertAfter === "" ? undefined : Number(insertAfter))}
                   style={{
                     display: "flex",
                     alignItems: "center",

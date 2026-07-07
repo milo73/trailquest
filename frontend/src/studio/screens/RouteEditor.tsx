@@ -97,20 +97,20 @@ export function RouteEditor() {
     }
   }
 
-  async function handleAddStop(poi: Parameters<typeof addStop>[0]) {
+  async function handleAddStop(poi: Parameters<typeof addStop>[0], insertAfter?: number) {
     setBusy(true);
     try {
-      await addStop(poi);
+      await addStop(poi, insertAfter);
     } finally {
       setBusy(false);
     }
     setAddMode(null);
   }
 
-  async function handleAddCustomStop(body: Parameters<typeof addCustomStop>[0]) {
+  async function handleAddCustomStop(body: Parameters<typeof addCustomStop>[0], insertAfter?: number) {
     setBusy(true);
     try {
-      await addCustomStop(body);
+      await addCustomStop(body, insertAfter);
     } finally {
       setBusy(false);
     }
@@ -787,6 +787,7 @@ export function RouteEditor() {
           excludeIds={draft.stops.map((s) => s.poi.id)}
           onPick={handleAddStop}
           onClose={() => setAddMode(null)}
+          stops={draft.stops.map((s) => ({ order: s.order, name: s.poi.name }))}
         />
       )}
 
@@ -794,8 +795,9 @@ export function RouteEditor() {
       {addMode === "custom" && (
         <CustomStopForm
           start={draft.start}
-          onSubmit={(body) => { handleAddCustomStop(body); }}
+          onSubmit={(body, insertAfter) => { handleAddCustomStop(body, insertAfter); }}
           onClose={() => setAddMode(null)}
+          stops={draft.stops.map((s) => ({ order: s.order, name: s.poi.name }))}
         />
       )}
 
