@@ -10,8 +10,8 @@ vi.mock("leaflet", () => ({
 }));
 
 vi.mock("react-leaflet", () => ({
-  MapContainer: ({ children }: { children?: React.ReactNode }) =>
-    React.createElement("div", { "data-testid": "map" }, children),
+  MapContainer: ({ children, style }: { children?: React.ReactNode; style?: React.CSSProperties }) =>
+    React.createElement("div", { "data-testid": "map", style }, children),
   TileLayer: ({ attribution }: { attribution?: string }) =>
     React.createElement("div", { "data-testid": "tile", "data-attribution": attribution }),
   Marker: ({ position, icon }: { position: [number, number]; icon?: { options?: { html?: string } } }) =>
