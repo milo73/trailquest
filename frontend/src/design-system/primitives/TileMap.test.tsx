@@ -31,3 +31,11 @@ test("adds a user marker when showUserDot with an active stop", () => {
   render(<TileMap stops={STOPS} activeOrder={1} showUserDot />);
   expect(screen.getAllByTestId("marker")).toHaveLength(4); // 3 stops + user
 });
+
+test("map container creates a stacking context so Leaflet z-indexes cannot cover page modals", () => {
+  render(<TileMap stops={STOPS} />);
+  const map = screen.getByTestId("map");
+  // position+zIndex trap Leaflet's internal z-indexes (panes 400-700,
+  // controls 1000) inside the map; modals at ~200 must stay on top.
+  expect(map).toHaveStyle({ position: "relative", zIndex: 0 });
+});

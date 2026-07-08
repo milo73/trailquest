@@ -65,7 +65,15 @@ export function TileMap({
   const center: [number, number] = pts[0] ?? [52.3812, 4.6361];
   const active = stops.find((s) => s.order === activeOrder);
   return (
-    <MapContainer center={center} zoom={14} style={{ width: "100%", height: "100%" }} scrollWheelZoom>
+    <MapContainer
+      center={center}
+      zoom={14}
+      // position+zIndex create a stacking context so Leaflet's internal
+      // z-indexes (panes 400-700, controls 1000) stay INSIDE the map and
+      // can't paint over page modals (which sit at z-index ~200).
+      style={{ width: "100%", height: "100%", position: "relative", zIndex: 0 }}
+      scrollWheelZoom
+    >
       <TileLayer
         attribution="&copy; OpenStreetMap contributors"
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
