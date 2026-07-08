@@ -266,6 +266,9 @@ class DraftRecord(BaseModel):
     estimated_duration_min: int
     status: DraftStatus
     attributions: list[str]
+    # Walking-path polyline (OSRM). Optional so records persisted before this
+    # field existed still parse; None means "no path" (haversine fallback).
+    route_geometry: list[GeoPoint] | None = None
     stop_refs: list[StopRef]
 
 
@@ -315,6 +318,7 @@ def _normalize_draft(draft: DraftTrail) -> DraftRecord:
         estimated_duration_min=draft.estimated_duration_min,
         status=draft.status,
         attributions=draft.attributions,
+        route_geometry=draft.route_geometry,
         stop_refs=refs,
     )
 
@@ -349,6 +353,7 @@ def _hydrate_draft(record: DraftRecord) -> DraftTrail:
         estimated_duration_min=record.estimated_duration_min,
         status=record.status,
         attributions=record.attributions,
+        route_geometry=record.route_geometry,
         stops=stops,
     )
 

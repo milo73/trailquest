@@ -36,3 +36,27 @@ def test_file_store_persists_across_instances(tmp_path):
     reopened = FileDraftStore(str(tmp_path))
     assert reopened.get("a").id == "a"
     assert [d.id for d in reopened.list_drafts()] == ["a"]
+
+
+def test_route_geometry_survives_the_put_get_roundtrip():
+    """The walking path must not be dropped by record normalization/hydration.
+
+    Regression: DraftRecord lacked route_geometry, so reopening a draft
+    (any put->get) silently degraded the map to straight lines.
+    """
+    d = _draft("geo")
+    d.route_geometry = [GeoPoint(lat=52.38, lon=4.63), GeoPoint(lat=52.39, lon=4.64)]
+    store = InMemoryDraftStore()
+    store.put(d)
+    got = store.get("geo")
+    assert got is not None
+    assert got.route_geometry == d.route_geometry
+
+
+def test_route_geometry_survives_file_store_restart(tmp_path):
+    d = _draft("geo")
+    d.route_geometry = [GeoPoint(lat=52.38, lon=4.63)]
+    FileDraftStore(str(tmp_path)).put(d)
+    reopened = FileDraftStore(str(tmp_path)).get("geo")
+    assert reopened is not None
+    assert reopened.route_geometry == d.route_geometry
